@@ -1,0 +1,289 @@
+/* ============================================================
+   Vaahan Core Plugin — Component Styles
+   vaahan-core/assets/css/vaahan-core.css
+
+   Styles for all shortcodes and custom components.
+   Variables inherited from vaahan-child/style.css
+   ============================================================ */
+
+
+/* ── VERDICT BOX ────────────────────────────── */
+
+.vaahan-verdict {
+  border-radius: 12px;
+  padding: 1.5rem 1.75rem;
+  margin: 2rem 0;
+  border-left: 4px solid;
+}
+
+.vaahan-verdict-yes     { background: #ECFDF5; border-color: #16A34A; }
+.vaahan-verdict-no      { background: #FFF1F0; border-color: #C0392B; }
+.vaahan-verdict-depends { background: #FFF8D6; border-color: #C9A800; }
+
+.vaahan-verdict-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0.5rem;
+}
+
+.vaahan-verdict-icon  { font-size: 1.25rem; }
+
+.vaahan-verdict-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #1A2545;
+}
+
+.vaahan-verdict-text {
+  font-size: 1rem;
+  color: #1A2545;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.6;
+}
+
+
+/* ── CALLOUT BOX ────────────────────────────── */
+
+.vaahan-callout {
+  border-radius: 0 8px 8px 0;
+  padding: 1.1rem 1.5rem;
+  margin: 1.5rem 0;
+  border-left: 4px solid;
+}
+
+.vaahan-callout-info    { background: #FFF8D6; border-color: #C9A800; }
+.vaahan-callout-warning { background: #FFF1F0; border-color: #C0392B; }
+.vaahan-callout-success { background: #ECFDF5; border-color: #16A34A; }
+
+.vaahan-callout-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #1A2545;
+  margin-bottom: 0.5rem;
+}
+
+.vaahan-callout-content p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #1A2545;
+  line-height: 1.65;
+}
+
+
+/* ── FEATURE BOX ────────────────────────────── */
+
+.vaahan-feature-box {
+  background: #F7F8FA;
+  border: 1px solid #E2E6EF;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.vaahan-feature-box-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #E2E6EF;
+}
+
+.vaahan-feature-box-icon  { font-size: 1.5rem; }
+
+.vaahan-feature-box-title {
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  color: #1A2545 !important;
+  margin: 0 !important;
+}
+
+.vaahan-feature-box-content p {
+  font-size: 0.95rem;
+  color: #4A5568;
+  line-height: 1.7;
+  margin-bottom: 0.75rem;
+}
+
+.vaahan-feature-box-content p:last-child { margin-bottom: 0; }
+
+
+/* ── COMPARE TABLE ──────────────────────────── */
+
+.vaahan-compare-table {
+  border: 1px solid #E2E6EF;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 1.75rem 0;
+}
+
+.vaahan-compare-title {
+  background: #1A2545;
+  color: #C9A800;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.75rem 1.25rem;
+}
+
+.vaahan-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.vaahan-compare-col { padding: 1.25rem; }
+.vaahan-compare-pros { background: #ECFDF5; border-right: 1px solid #E2E6EF; }
+.vaahan-compare-cons { background: #FFF1F0; }
+
+.vaahan-compare-col-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.75rem;
+  color: #1A2545;
+}
+
+.vaahan-compare-col ul {
+  list-style: none;
+  padding: 0; margin: 0;
+}
+
+.vaahan-compare-col ul li {
+  font-size: 0.875rem;
+  color: #1A2545;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  line-height: 1.5;
+}
+
+.vaahan-compare-col ul li:last-child { border-bottom: none; }
+
+@media (max-width: 600px) {
+  .vaahan-compare-grid { grid-template-columns: 1fr; }
+  .vaahan-compare-pros { border-right: none; border-bottom: 1px solid #E2E6EF; }
+}
+
+
+/* ── TABLE OF CONTENTS ──────────────────────── */
+
+.vaahan-toc {
+  background: #F7F8FA;
+  border: 1px solid #E2E6EF;
+  border-left: 3px solid #C9A800;
+  border-radius: 0 8px 8px 0;
+  padding: 1.25rem 1.5rem;
+  margin: 1.75rem 0;
+}
+
+.vaahan-toc-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #1A2545;
+  margin-bottom: 0.85rem;
+}
+
+.vaahan-toc-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.vaahan-toc-list li {
+  padding: 0.2rem 0;
+  font-size: 0.88rem;
+}
+
+.vaahan-toc-list a {
+  color: #1A2545;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.vaahan-toc-list a:hover { color: #C9A800; }
+
+
+/* ── NEWSLETTER WIDGET ──────────────────────── */
+
+.vaahan-newsletter-widget {
+  background: #1A2545;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.vaahan-newsletter-widget h4 {
+  color: white !important;
+  font-size: 1rem !important;
+  margin-bottom: 0.35rem !important;
+}
+
+.vaahan-newsletter-widget p {
+  color: rgba(255,255,255,0.55) !important;
+  font-size: 0.82rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.vaahan-nl-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vaahan-nl-input {
+  padding: 0.75rem 1rem;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  color: white;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+  font-family: inherit;
+}
+
+.vaahan-nl-input::placeholder { color: rgba(255,255,255,0.3); }
+.vaahan-nl-input:focus { border-color: rgba(201,168,0,0.5); }
+
+
+/* ── LEAD FORM WRAPPER ──────────────────────── */
+
+.vaahan-lead-form-wrapper {
+  border-radius: 12px;
+  padding: 1.75rem 2rem;
+  margin: 2rem 0;
+}
+
+.vaahan-lead-form-insurance { background: #1A2545; }
+.vaahan-lead-form-auto_loan { background: #1A2545; }
+.vaahan-lead-form-general   { background: #F7F8FA; border: 1px solid #E2E6EF; }
+
+.vaahan-lead-form-wrapper h3 {
+  margin-bottom: 0.35rem !important;
+}
+
+.vaahan-lead-form-insurance h3,
+.vaahan-lead-form-auto_loan h3 {
+  color: white !important;
+}
+
+.vaahan-lead-form-general h3 {
+  color: #1A2545 !important;
+}
+
+.vaahan-lead-form-insurance p,
+.vaahan-lead-form-auto_loan p {
+  color: rgba(255,255,255,0.55) !important;
+}
+
+@media (max-width: 600px) {
+  .vaahan-lead-form-wrapper { padding: 1.25rem; }
+}

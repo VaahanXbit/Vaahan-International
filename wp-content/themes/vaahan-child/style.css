@@ -1,0 +1,575 @@
+/*
+ * Theme Name:   Vaahan Child
+ * Theme URI:    https://vaahan-international.com
+ * Description:  Astra child theme for Vaahan International. 
+ *               All brand customisations live here.
+ *               DO NOT edit Astra parent theme files directly.
+ * Author:       Vaahan International
+ * Template:     astra
+ * Version:      1.0.0
+ * Text Domain:  vaahan-child
+ */
+
+/* ============================================================
+   VAAHAN INTERNATIONAL — BRAND VARIABLES
+   Colours extracted from official logo (navy + gold on yellow)
+   ============================================================ */
+
+:root {
+  /* Brand Colours */
+  --vaahan-navy:        #1A2545;
+  --vaahan-navy-mid:    #222F55;
+  --vaahan-navy-light:  #2B3A65;
+  --vaahan-gold:        #C9A800;
+  --vaahan-gold-light:  #E2C000;
+  --vaahan-gold-pale:   #FFF8D6;
+
+  /* Neutrals */
+  --vaahan-white:       #FFFFFF;
+  --vaahan-off-white:   #F7F8FA;
+  --vaahan-grey-light:  #F0F2F6;
+  --vaahan-grey-mid:    #E2E6EF;
+
+  /* Text */
+  --vaahan-text-dark:   #1A2545;
+  --vaahan-text-mid:    #4A5568;
+  --vaahan-text-muted:  #8A95A8;
+
+  /* Status */
+  --vaahan-success:     #1A7A4A;
+  --vaahan-warning:     #B7700A;
+  --vaahan-error:       #C0392B;
+
+  /* Typography */
+  --vaahan-font:        'Inter', system-ui, -apple-system, sans-serif;
+  --vaahan-font-size:   16px;
+  --vaahan-line-height: 1.7;
+
+  /* Spacing */
+  --vaahan-radius-sm:   6px;
+  --vaahan-radius-md:   12px;
+  --vaahan-radius-lg:   20px;
+
+  /* Shadows */
+  --vaahan-shadow-sm:   0 1px 4px rgba(26,37,69,0.07);
+  --vaahan-shadow-md:   0 4px 16px rgba(26,37,69,0.10);
+  --vaahan-shadow-lg:   0 12px 40px rgba(26,37,69,0.13);
+
+  /* Layout */
+  --vaahan-max-width:   1140px;
+  --vaahan-nav-height:  70px;
+}
+
+
+/* ============================================================
+   GOOGLE FONTS IMPORT
+   Import Inter — clean, modern, highly readable
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+
+/* ============================================================
+   BASE OVERRIDES
+   Override Astra defaults to match Vaahan brand
+   ============================================================ */
+
+body {
+  font-family: var(--vaahan-font) !important;
+  font-size: var(--vaahan-font-size) !important;
+  line-height: var(--vaahan-line-height) !important;
+  color: var(--vaahan-text-dark) !important;
+  background-color: var(--vaahan-white) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography scale */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--vaahan-font) !important;
+  color: var(--vaahan-navy) !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.02em;
+}
+
+h1 { font-size: clamp(1.9rem, 4vw, 3rem) !important; }
+h2 { font-size: clamp(1.5rem, 3vw, 2.25rem) !important; }
+h3 { font-size: clamp(1.15rem, 2vw, 1.5rem) !important; }
+h4 { font-size: 1.15rem !important; }
+
+p {
+  color: var(--vaahan-text-mid);
+  line-height: 1.8;
+  margin-bottom: 1.25rem;
+}
+
+a {
+  color: var(--vaahan-gold);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--vaahan-gold-light);
+}
+
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+
+/* Nav wrapper */
+.site-header,
+#masthead {
+  background-color: var(--vaahan-navy) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 999 !important;
+  height: var(--vaahan-nav-height) !important;
+}
+
+/* Logo text fallback */
+.site-title a,
+.site-title a:hover {
+  color: var(--vaahan-white) !important;
+  font-weight: 800 !important;
+  font-size: 1.15rem !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+/* Nav menu items */
+.main-navigation a,
+.main-header-menu a,
+#site-navigation a {
+  color: rgba(255,255,255,0.65) !important;
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  transition: color 0.2s !important;
+}
+
+.main-navigation a:hover,
+.main-header-menu a:hover,
+#site-navigation a:hover {
+  color: var(--vaahan-white) !important;
+  background: transparent !important;
+}
+
+/* CTA button in nav — Subscribe Free */
+.main-navigation .nav-cta a,
+.nav-cta a {
+  background-color: var(--vaahan-gold) !important;
+  color: var(--vaahan-navy) !important;
+  padding: 0.45rem 1.1rem !important;
+  border-radius: var(--vaahan-radius-sm) !important;
+  font-weight: 700 !important;
+  transition: background 0.2s !important;
+}
+
+.main-navigation .nav-cta a:hover,
+.nav-cta a:hover {
+  background-color: var(--vaahan-gold-light) !important;
+  color: var(--vaahan-navy) !important;
+}
+
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+
+/* Primary button — gold */
+.vaahan-btn-primary,
+.wp-block-button__link,
+.elementor-button {
+  background-color: var(--vaahan-gold) !important;
+  color: var(--vaahan-navy) !important;
+  border: none !important;
+  border-radius: var(--vaahan-radius-sm) !important;
+  padding: 0.85rem 1.65rem !important;
+  font-weight: 700 !important;
+  font-size: 0.92rem !important;
+  font-family: var(--vaahan-font) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.vaahan-btn-primary:hover,
+.wp-block-button__link:hover,
+.elementor-button:hover {
+  background-color: var(--vaahan-gold-light) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(201,168,0,0.3) !important;
+}
+
+/* Secondary button — outline */
+.vaahan-btn-secondary {
+  background-color: transparent !important;
+  color: var(--vaahan-navy) !important;
+  border: 2px solid var(--vaahan-navy) !important;
+  border-radius: var(--vaahan-radius-sm) !important;
+  padding: 0.85rem 1.65rem !important;
+  font-weight: 600 !important;
+  font-size: 0.92rem !important;
+  font-family: var(--vaahan-font) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.vaahan-btn-secondary:hover {
+  background-color: var(--vaahan-navy) !important;
+  color: var(--vaahan-white) !important;
+}
+
+
+/* ============================================================
+   ARTICLE / POST CARDS
+   ============================================================ */
+
+.vaahan-article-card {
+  background: var(--vaahan-white);
+  border: 1px solid var(--vaahan-grey-mid);
+  border-radius: var(--vaahan-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--vaahan-shadow-sm);
+  transition: all 0.25s ease;
+}
+
+.vaahan-article-card:hover {
+  box-shadow: var(--vaahan-shadow-lg);
+  transform: translateY(-4px);
+  border-color: rgba(201,168,0,0.3);
+}
+
+/* Category tag pill */
+.vaahan-tag {
+  display: inline-flex;
+  align-items: center;
+  background: var(--vaahan-gold-pale);
+  color: #856900;
+  padding: 0.28rem 0.75rem;
+  border-radius: 100px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Article meta — read time, date */
+.vaahan-meta {
+  font-size: 0.75rem;
+  color: var(--vaahan-text-muted);
+}
+
+
+/* ============================================================
+   SINGLE ARTICLE / POST
+   ============================================================ */
+
+.single .entry-content,
+.single .entry-content p {
+  font-size: 1.05rem !important;
+  line-height: 1.85 !important;
+  color: var(--vaahan-text-mid) !important;
+  max-width: 720px;
+}
+
+/* Article headings */
+.single .entry-content h2 {
+  font-size: 1.65rem !important;
+  margin-top: 2.5rem !important;
+  margin-bottom: 1rem !important;
+  color: var(--vaahan-navy) !important;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--vaahan-gold-pale);
+}
+
+.single .entry-content h3 {
+  font-size: 1.25rem !important;
+  margin-top: 2rem !important;
+  color: var(--vaahan-navy) !important;
+}
+
+/* Callout / highlight box inside articles */
+.vaahan-callout {
+  background: var(--vaahan-gold-pale);
+  border-left: 4px solid var(--vaahan-gold);
+  border-radius: 0 var(--vaahan-radius-sm) var(--vaahan-radius-sm) 0;
+  padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+  font-size: 1rem;
+  color: var(--vaahan-text-dark);
+}
+
+/* Verdict box — at end of articles */
+.vaahan-verdict {
+  background: var(--vaahan-navy);
+  border-radius: var(--vaahan-radius-md);
+  padding: 1.75rem 2rem;
+  margin: 2.5rem 0;
+  color: var(--vaahan-white);
+}
+
+.vaahan-verdict h4 {
+  color: var(--vaahan-gold) !important;
+  font-size: 0.75rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.75rem !important;
+}
+
+.vaahan-verdict p {
+  color: rgba(255,255,255,0.8) !important;
+  margin-bottom: 0 !important;
+}
+
+
+/* ============================================================
+   LEAD CAPTURE FORMS
+   ============================================================ */
+
+.vaahan-lead-form-wrapper {
+  background: var(--vaahan-navy);
+  border-radius: var(--vaahan-radius-lg);
+  padding: 2rem 2.25rem;
+  margin: 2.5rem 0;
+}
+
+.vaahan-lead-form-wrapper h3 {
+  color: var(--vaahan-white) !important;
+  font-size: 1.15rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.vaahan-lead-form-wrapper p {
+  color: rgba(255,255,255,0.55) !important;
+  font-size: 0.875rem !important;
+  margin-bottom: 1.25rem !important;
+}
+
+/* WPForms overrides inside lead form */
+.vaahan-lead-form-wrapper .wpforms-field input,
+.vaahan-lead-form-wrapper .wpforms-field select,
+.vaahan-lead-form-wrapper .wpforms-field textarea {
+  background: rgba(255,255,255,0.07) !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  border-radius: var(--vaahan-radius-sm) !important;
+  color: var(--vaahan-white) !important;
+  font-family: var(--vaahan-font) !important;
+  font-size: 0.9rem !important;
+  padding: 0.8rem 1rem !important;
+  transition: border-color 0.2s !important;
+}
+
+.vaahan-lead-form-wrapper .wpforms-field input:focus,
+.vaahan-lead-form-wrapper .wpforms-field select:focus {
+  border-color: rgba(201,168,0,0.5) !important;
+  outline: none !important;
+}
+
+.vaahan-lead-form-wrapper .wpforms-field input::placeholder {
+  color: rgba(255,255,255,0.3) !important;
+}
+
+.vaahan-lead-form-wrapper .wpforms-submit {
+  background: var(--vaahan-gold) !important;
+  color: var(--vaahan-navy) !important;
+  border: none !important;
+  border-radius: var(--vaahan-radius-sm) !important;
+  padding: 0.875rem 1.75rem !important;
+  font-weight: 700 !important;
+  font-family: var(--vaahan-font) !important;
+  width: 100% !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+  font-size: 0.95rem !important;
+}
+
+.vaahan-lead-form-wrapper .wpforms-submit:hover {
+  background: var(--vaahan-gold-light) !important;
+  transform: translateY(-1px) !important;
+}
+
+
+/* ============================================================
+   NEWSLETTER SECTION
+   ============================================================ */
+
+.vaahan-newsletter-section {
+  background: var(--vaahan-navy);
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.vaahan-newsletter-section h2 {
+  color: var(--vaahan-white) !important;
+  margin-bottom: 1rem !important;
+}
+
+.vaahan-newsletter-section h2 span {
+  color: var(--vaahan-gold);
+}
+
+.vaahan-newsletter-section p {
+  color: rgba(255,255,255,0.55) !important;
+  max-width: 500px;
+  margin: 0 auto 2rem !important;
+}
+
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+
+.site-footer,
+#colophon {
+  background-color: var(--vaahan-navy) !important;
+  color: rgba(255,255,255,0.5) !important;
+  border-top: 2px solid var(--vaahan-gold) !important;
+  padding: 2.5rem !important;
+}
+
+.site-footer a,
+#colophon a {
+  color: rgba(255,255,255,0.5) !important;
+  transition: color 0.2s !important;
+}
+
+.site-footer a:hover,
+#colophon a:hover {
+  color: var(--vaahan-white) !important;
+}
+
+.site-footer .site-info,
+#colophon .site-info {
+  font-size: 0.78rem !important;
+}
+
+
+/* ============================================================
+   TICKER STRIP
+   ============================================================ */
+
+.vaahan-ticker {
+  background: var(--vaahan-gold);
+  padding: 0.6rem 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.vaahan-ticker-track {
+  display: inline-flex;
+  animation: vaahan-ticker 30s linear infinite;
+}
+
+.vaahan-ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--vaahan-navy);
+  padding: 0 2rem;
+}
+
+@keyframes vaahan-ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+
+.vaahan-container {
+  max-width: var(--vaahan-max-width);
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.vaahan-section {
+  padding: 5rem 2rem;
+}
+
+.vaahan-section-alt {
+  background: var(--vaahan-off-white);
+}
+
+.vaahan-section-dark {
+  background: var(--vaahan-navy);
+}
+
+/* Section label */
+.vaahan-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--vaahan-gold);
+  margin-bottom: 0.85rem;
+}
+
+.vaahan-label::before {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--vaahan-gold);
+  border-radius: 2px;
+}
+
+/* Fade-in scroll animation */
+.vaahan-fade {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.vaahan-fade.visible {
+  opacity: 1;
+  transform: none;
+}
+
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 768px) {
+  :root {
+    --vaahan-nav-height: 60px;
+  }
+
+  .vaahan-section {
+    padding: 3.5rem 1.25rem;
+  }
+
+  .vaahan-container {
+    padding: 0 1.25rem;
+  }
+
+  .single .entry-content,
+  .single .entry-content p {
+    font-size: 1rem !important;
+  }
+
+  .vaahan-lead-form-wrapper {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .vaahan-section {
+    padding: 2.5rem 1rem;
+  }
+}
