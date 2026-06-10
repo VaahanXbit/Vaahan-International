@@ -167,7 +167,7 @@ import { motion } from 'framer-motion'
 
 const Hero = () => {
     return (
-        <section className="relative min-h-[85vh] flex items-center overflow-hidden">
+        <section className="relative min-h-[85vh] flex items-center overflow-hidden pt-20 mt-0">
             {/* Background Video - Full Width Infinite Loop */}
             <div className="absolute inset-0 w-full h-full z-0">
                 <video
@@ -202,11 +202,21 @@ const Hero = () => {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.6, ease: 'easeOut' }}
                     >
+                        {/* Trust Badge */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2, duration: 0.5 }}
+                            className="inline-block px-4 py-1.5 bg-yellow-500 rounded-full text-gray-900 text-sm font-semibold mb-6"
+                        >
+                            🚗 Trusted by 10,000+ Indian Car Buyers
+                        </motion.div>
+
                         {/* Main Heading */}
                         <motion.h1
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2, duration: 0.5 }}
+                            transition={{ delay: 0.3, duration: 0.5 }}
                             className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6 text-white"
                         >
                             Modern Car Features{' '}
@@ -217,7 +227,7 @@ const Hero = () => {
                         <motion.p
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3, duration: 0.5 }}
+                            transition={{ delay: 0.4, duration: 0.5 }}
                             className="text-xl text-gray-200 mb-4"
                         >
                             Helping Indian car buyers understand automotive technology before making a purchase decision.
@@ -226,7 +236,7 @@ const Hero = () => {
                         <motion.p
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.4, duration: 0.5 }}
+                            transition={{ delay: 0.5, duration: 0.5 }}
                             className="text-gray-300 mb-8"
                         >
                             From safety features like ABS and Airbags to advanced technologies such as ADAS, Connected Cars, and Electric Vehicles, Vaahan International simplifies complex automotive concepts into easy-to-understand guides.
@@ -236,12 +246,12 @@ const Hero = () => {
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.5, duration: 0.5 }}
+                            transition={{ delay: 0.6, duration: 0.5 }}
                             className="flex flex-wrap gap-4"
                         >
                             <Link 
                                 to="/category" 
-                                className="bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-semibold py-3 px-8 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+                                className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold py-3 px-8 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
                             >
                                 Explore Features →
                             </Link>
@@ -257,9 +267,9 @@ const Hero = () => {
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.6, duration: 0.5 }}
+                            transition={{ delay: 0.7, duration: 0.5 }}
                             className="flex flex-wrap gap-8 mt-12 pt-8 border-t border-white/20"
-                         >
+                        >
                             <div>
                                 <div className="text-3xl font-bold text-yellow-400">100+</div>
                                 <div className="text-gray-300 text-sm">Features</div>
