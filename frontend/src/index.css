@@ -41,7 +41,105 @@
 }
 
 /* ========================================
-   Base Styles - Optimized for performance
+   UNIFIED THEME TRANSITION - 0.8s for everything
+   ======================================== */
+
+/* 
+   CRITICAL: All theme-aware elements must use the SAME duration
+   This ensures smooth, professional theme transitions
+*/
+.theme-transition,
+.theme-transition *,
+body,
+html,
+#root,
+div,
+section,
+article,
+header,
+footer,
+main,
+nav,
+aside,
+.card,
+.btn-primary,
+.btn-secondary,
+.input-field,
+.glass-card,
+.bg-theme-primary,
+.bg-theme-secondary,
+.bg-theme-tertiary,
+.bg-theme-card,
+.text-theme-primary,
+.text-theme-secondary,
+.text-theme-tertiary,
+.border-theme,
+.bg-white,
+.bg-gray-50,
+.bg-gray-100,
+.bg-gray-200,
+.bg-gray-900,
+.bg-dark-800,
+.bg-dark-900,
+.bg-dark-700,
+.bg-dark-950,
+.text-gray-900,
+.text-gray-800,
+.text-gray-700,
+.text-gray-600,
+.text-gray-500,
+.text-gray-400,
+.text-gray-300,
+.text-white,
+.border-gray-200,
+.border-gray-300,
+.border-dark-700,
+.border-dark-600,
+.shadow-lg,
+.shadow-xl,
+.shadow-md,
+.shadow-sm,
+.shadow-2xl,
+.hover\:bg-gray-50,
+.hover\:bg-gray-100,
+.hover\:bg-dark-700,
+.hover\:bg-dark-600 {
+  transition: 
+    background-color 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    fill 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    stroke 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    background-image 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover/active states should be faster for interactivity */
+.btn-primary:hover,
+.btn-secondary:hover,
+.card:hover,
+button:hover,
+a:hover {
+  transition: 
+    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Prevent transitions on elements that should change instantly */
+.no-transition,
+.no-transition * {
+  transition: none !important;
+}
+
+/* Theme transition class - applied during theme change */
+.theme-transition {
+  --transition-duration: 0.8s;
+}
+
+/* ========================================
+   Base Styles
    ======================================== */
 @layer base {
   html {
@@ -49,21 +147,10 @@
   }
 
   body {
-  @apply font-sans antialiased;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  /* Remove transition from body */
-}
-
-/* Theme transition class - only applied where needed */
-.theme-transition {
-  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-
-/* For specific elements that need instant theme change */
-.no-transition {
-  transition: none !important;
-}
+    @apply font-sans antialiased;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-bold tracking-tight;
@@ -107,21 +194,21 @@
   }
 
   .btn-primary {
-    @apply bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-3 px-6 rounded-lg transition-all duration-150 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2;
+    @apply bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-3 px-6 rounded-lg transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2;
   }
 
   .btn-secondary {
-    @apply bg-white dark:bg-dark-800 border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-dark-700 font-semibold py-3 px-6 rounded-lg transition-all duration-150 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500;
+    @apply bg-white dark:bg-dark-800 border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-dark-700 font-semibold py-3 px-6 rounded-lg transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500;
   }
 
   .card {
     background-color: var(--bg-card);
-    @apply rounded-xl shadow-md hover:shadow-xl transition-shadow duration-150 overflow-hidden border;
+    @apply rounded-xl shadow-md hover:shadow-xl overflow-hidden border;
     border-color: var(--border-primary);
   }
 
   .input-field {
-    @apply w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-colors duration-150;
+    @apply w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent;
     background-color: var(--bg-input);
     color: var(--text-primary);
     border: 1px solid var(--border-primary);
@@ -207,7 +294,9 @@ section { scroll-margin-top: 80px; }
 /* ========================================
    Footer Styles
    ======================================== */
-footer { background-color: var(--footer-bg) !important; }
+footer { 
+  background-color: var(--footer-bg) !important;
+}
 footer .text-gray-400 { color: #9ca3af !important; }
 footer .text-gray-500 { color: #6b7280 !important; }
 footer .text-white { color: #ffffff !important; }
@@ -265,7 +354,7 @@ footer .text-white { color: #ffffff !important; }
 .article-content a {
   color: #eab308;
   text-decoration: underline;
-  transition: color 0.15s ease;
+  transition: color 0.2s ease;
 }
 
 .article-content a:hover {
@@ -348,6 +437,17 @@ footer .text-white { color: #ffffff !important; }
 }
 
 /* ========================================
+   Scrollbar Hide Utility
+   ======================================== */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ========================================
    Responsive Styles
    ======================================== */
 /* Mobile menu improvements */
@@ -408,15 +508,4 @@ footer .text-white { color: #ffffff !important; }
     --text-primary: #000000;
     --text-secondary: #333333;
   }
-}
-
-/* ========================================
-   Scrollbar Hide Utility
-   ======================================== */
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
 }

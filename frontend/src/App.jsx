@@ -11,7 +11,7 @@ Copyright : (c) 2026 Vaahan International. All rights reserved.
 */
 
 import { useEffect } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom' // Remove BrowserRouter
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import Home from './pages/Home'
 import About from './pages/About'
@@ -38,7 +38,7 @@ const ScrollToTop = () => {
 function App() {
   return (
     <ThemeProvider>
-      <div className="flex flex-col min-h-screen bg-white dark:bg-dark-950 theme-transition">
+      <div className="flex flex-col min-h-screen bg-white dark:bg-dark-950">
         <CommonHeader />
         <main className="flex-grow pt-0">
           <ScrollToTop />
