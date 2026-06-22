@@ -3,8 +3,8 @@
 ================================================================================
 File Name : OTP.js
 Author : Tahseen Raza
-Created Date : 2026-06-19
-Description : OTP model for storing verification codes
+Created Date : 2026-06-22
+Description : OTP model for Email & Phone verification
 Company : Vaahan International
 Copyright : (c) 2026 Vaahan International. All rights reserved.
 ================================================================================
@@ -29,7 +29,7 @@ const OTPSchema = new mongoose.Schema({
   },
   purpose: {
     type: String,
-    enum: ['verify', 'login', 'reset_password'],
+    enum: ['verify', 'login', 'verify_phone', 'reset_password'],
     default: 'verify',
   },
   expiresAt: {

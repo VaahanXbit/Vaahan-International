@@ -1,18 +1,53 @@
-// src/data/cars/index.js - Updated to include factorScores
+// src/data/cars/index.js
+/*
+================================================================================
+File Name : index.js
+Author : Tahseen Raza
+Created Date : 2026-06-22
+Description : Car data service - Now fetches from backend API
+Company : Vaahan International
+Copyright : (c) 2026 Vaahan International. All rights reserved.
+================================================================================
+*/
 
-import hyundaiData from './hyundai.json'
-import kiaData from './kia.json'
-import tataData from './tata.json'
-import mahindraData from './mahindra.json'
-import suzukiData from './suzuki.json'
+import { api } from '../../services/api';
 
-// All brand data
-const allBrands = [hyundaiData, kiaData, tataData, mahindraData, suzukiData]
+// Cache for car data
+let carDataCache = null;
+let isFetching = false;
+let fetchPromise = null;
+
+// Fetch car data from backend
+const fetchCarData = async () => {
+  if (carDataCache) return carDataCache;
+  
+  if (isFetching) {
+    return fetchPromise;
+  }
+  
+  isFetching = true;
+  fetchPromise = api.getAllCars().then(result => {
+    isFetching = false;
+    if (result.success) {
+      carDataCache = result.data;
+      return carDataCache;
+    }
+    console.error('❌ Failed to fetch car data:', result.message);
+    return [];
+  }).catch(error => {
+    isFetching = false;
+    console.error('❌ Error fetching car data:', error);
+    return [];
+  });
+  
+  return fetchPromise;
+};
 
 // Get all cars with variants flattened
-export const getAllCars = () => {
-  const cars = []
-  allBrands.forEach(brand => {
+export const getAllCars = async () => {
+  const data = await fetchCarData();
+  const cars = [];
+  data.forEach(brand => {
     brand.models.forEach(model => {
       model.variants.forEach(variant => {
         cars.push({
@@ -25,49 +60,53 @@ export const getAllCars = () => {
           price: variant.price,
           overallScore: variant.overallScore || 0,
           scores: variant.scores || null,
-          factorScores: variant.factorScores || null // <- ADD THIS
-        })
-      })
-    })
-  })
-  return cars
-}
+          factorScores: variant.factorScores || null,
+        });
+      });
+    });
+  });
+  return cars;
+};
 
 // Get all brands
-export const getAllBrands = () => {
-  return allBrands.map(brand => brand.brand)
-}
+export const getAllBrands = async () => {
+  const data = await fetchCarData();
+  return data.map(brand => brand.brand);
+};
 
 // Get models by brand
-export const getModelsByBrand = (brandName) => {
-  const brand = allBrands.find(b => b.brand === brandName)
-  if (!brand) return []
-  return brand.models.map(model => model.name)
-}
+export const getModelsByBrand = async (brandName) => {
+  const data = await fetchCarData();
+  const brand = data.find(b => b.brand === brandName);
+  if (!brand) return [];
+  return brand.models.map(model => model.name);
+};
 
 // Get variants by brand and model
-export const getVariantsByBrandAndModel = (brandName, modelName) => {
-  const brand = allBrands.find(b => b.brand === brandName)
-  if (!brand) return []
-  const model = brand.models.find(m => m.name === modelName)
-  if (!model) return []
+export const getVariantsByBrandAndModel = async (brandName, modelName) => {
+  const data = await fetchCarData();
+  const brand = data.find(b => b.brand === brandName);
+  if (!brand) return [];
+  const model = brand.models.find(m => m.name === modelName);
+  if (!model) return [];
   return model.variants.map(variant => ({
     name: variant.name,
     price: variant.price,
     overallScore: variant.overallScore || 0,
     scores: variant.scores || null,
-    factorScores: variant.factorScores || null // <- ADD THIS
-  }))
-}
+    factorScores: variant.factorScores || null,
+  }));
+};
 
 // Get full car data by brand, model, and variant
-export const getCarByBrandModelVariant = (brandName, modelName, variantName) => {
-  const brand = allBrands.find(b => b.brand === brandName)
-  if (!brand) return null
-  const model = brand.models.find(m => m.name === modelName)
-  if (!model) return null
-  const variant = model.variants.find(v => v.name === variantName)
-  if (!variant) return null
+export const getCarByBrandModelVariant = async (brandName, modelName, variantName) => {
+  const data = await fetchCarData();
+  const brand = data.find(b => b.brand === brandName);
+  if (!brand) return null;
+  const model = brand.models.find(m => m.name === modelName);
+  if (!model) return null;
+  const variant = model.variants.find(v => v.name === variantName);
+  if (!variant) return null;
   
   return {
     id: `${brand.brand}-${model.name}-${variant.name}`,
@@ -79,23 +118,21 @@ export const getCarByBrandModelVariant = (brandName, modelName, variantName) => 
     price: variant.price,
     overallScore: variant.overallScore || 0,
     scores: variant.scores || null,
-    factorScores: variant.factorScores || null // <- ADD THIS
-  }
-}
+    factorScores: variant.factorScores || null,
+  };
+};
 
 // Search cars
-export const searchCars = (query) => {
-  if (!query || query.trim() === '') return []
-  const searchTerm = query.toLowerCase().trim()
-  const allCars = getAllCars()
-  return allCars.filter(car => 
-    car.brand.toLowerCase().includes(searchTerm) ||
-    car.model.toLowerCase().includes(searchTerm) ||
-    car.variant.toLowerCase().includes(searchTerm)
-  )
-}
+export const searchCars = async (query) => {
+  if (!query || query.trim() === '') return [];
+  const result = await api.searchCars(query.trim());
+  if (result.success) {
+    return result.data;
+  }
+  return [];
+};
 
-// Popular comparisons
+// Popular comparisons (static - can be fetched from backend)
 export const popularComparisons = [
   {
     id: 1,
@@ -137,7 +174,7 @@ export const popularComparisons = [
     car1Brand: "Mahindra",
     car2Brand: "Kia"
   }
-]
+];
 
 export default {
   getAllCars,
@@ -147,4 +184,4 @@ export default {
   getCarByBrandModelVariant,
   searchCars,
   popularComparisons
-}
+};

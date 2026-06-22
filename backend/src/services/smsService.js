@@ -3,55 +3,47 @@
 ================================================================================
 File Name : smsService.js
 Author : Tahseen Raza
-Created Date : 2026-06-19
-Description : SMS service for sending OTP via Twilio
+Created Date : 2026-06-22
+Description : SMS service for sending OTP via Twilio (or other providers)
 Company : Vaahan International
 Copyright : (c) 2026 Vaahan International. All rights reserved.
 ================================================================================
 */
 
-import twilio from 'twilio'
+// Note: This is a placeholder. Uncomment when you have SMS provider configured.
 
-// Initialize Twilio client
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-)
-
-export const sendOTPSMS = async (mobile, otp, name = '') => {
+const sendSMSOTP = async (phoneNumber, otp, purpose = 'verify') => {
   try {
-    // Format mobile number (add +91 if not present)
-    let formattedMobile = mobile
-    if (!mobile.startsWith('+')) {
-      formattedMobile = `+91${mobile}`
-    }
-
-    const message = `
-      Vaahan International - OTP Verification
-      
-      Hello${name ? ' ' + name : ''}!
-      
-      Your verification code is: ${otp}
-      
-      This OTP is valid for 10 minutes.
-      
-      Please do not share this OTP with anyone.
-      
-      © 2026 Vaahan International
-    `
-
+    console.log(`📱 Would send SMS to ${phoneNumber} with OTP: ${otp}`);
+    console.log(`📱 Purpose: ${purpose}`);
+    
+    // For development, just log the OTP
+    console.log(`📱 [DEV] SMS OTP for ${phoneNumber}: ${otp}`);
+    
+    // TODO: Integrate with Twilio, TextLocal, or other SMS provider
+    // Example with Twilio (uncomment when ready):
+    /*
+    const twilio = require('twilio');
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    
     await client.messages.create({
-      body: message,
-      to: formattedMobile,
-      from: process.env.TWILIO_PHONE_NUMBER
-    })
-
-    console.log(`✅ OTP SMS sent to ${mobile}`)
-    return { success: true }
+      body: `Your OTP for Vaahan International is: ${otp}. Valid for 10 minutes.`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phoneNumber
+    });
+    */
+    
+    // For now, return success (simulated)
+    return { 
+      success: true, 
+      messageId: 'simulated-' + Date.now(),
+      status: 'simulated'
+    };
+    
   } catch (error) {
-    console.error('❌ SMS send error:', error)
-    // For development, log the OTP
-    console.log(`📱 Development OTP for ${mobile}: ${otp}`)
-    return { success: false, error: error.message }
+    console.error('❌ SMS sending failed:', error);
+    return { success: false, error: error.message };
   }
-}
+};
+
+module.exports = { sendSMSOTP };

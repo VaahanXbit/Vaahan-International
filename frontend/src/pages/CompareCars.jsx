@@ -1216,29 +1216,11 @@
 
 
 // src/pages/CompareCars.jsx
-/*
-================================================================================
-File Name : CompareCars.jsx
-Author : Tahseen Raza
-Created Date : 2025-01-16
-Description : Professional car comparison with CarDekho-style selection
-Company : Vaahan International
-Copyright : (c) 2026 Vaahan International. All rights reserved.
-================================================================================
-*/
-
 import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../context/ThemeContext'
-import { 
-  getAllBrands, 
-  getModelsByBrand, 
-  getVariantsByBrandAndModel,
-  getCarByBrandModelVariant,
-  popularComparisons,
-  getAllCars 
-} from '../data/cars/index'
+import { api } from '../services/api'
 
 // ========================================
 // CarDekho Style Car Selection Popup - Clean list format
@@ -1248,8 +1230,9 @@ const CarSelectionPopup = ({
   onClose, 
   onSelect, 
   isDark, 
-  position,
-  anchorRef 
+  anchorRef,
+  carsData,
+  brandsData
 }) => {
   const [selectedBrand, setSelectedBrand] = useState('')
   const [selectedModel, setSelectedModel] = useState('')
@@ -1260,7 +1243,8 @@ const CarSelectionPopup = ({
   const popupRef = useRef(null)
   const searchInputRef = useRef(null)
 
-  const brands = getAllBrands()
+  // Get brands from props
+  const brands = brandsData || []
 
   useEffect(() => {
     if (isOpen && anchorRef?.current) {
@@ -1298,6 +1282,29 @@ const CarSelectionPopup = ({
     }
   }, [isOpen, step])
 
+  // Get unique brands from cars data
+  const getBrands = () => {
+    if (!carsData) return []
+    return [...new Set(carsData.map(c => c.brand))]
+  }
+
+  // Get models for a brand
+  const getModelsForBrand = (brand) => {
+    if (!carsData) return []
+    const models = carsData
+      .filter(c => c.brand === brand)
+      .map(c => c.model)
+    return [...new Set(models)]
+  }
+
+  // Get variants for a brand and model
+  const getVariantsForBrandModel = (brand, model) => {
+    if (!carsData) return []
+    return carsData
+      .filter(c => c.brand === brand && c.model === model)
+      .map(c => c.variant)
+  }
+
   const handleBrandSelect = (brand) => {
     setSelectedBrand(brand)
     setSelectedModel('')
@@ -1315,7 +1322,11 @@ const CarSelectionPopup = ({
 
   const handleVariantSelect = (variant) => {
     setSelectedVariant(variant)
-    const car = getCarByBrandModelVariant(selectedBrand, selectedModel, variant)
+    const car = carsData?.find(c => 
+      c.brand === selectedBrand && 
+      c.model === selectedModel && 
+      c.variant === variant
+    )
     if (car) {
       onSelect(car)
       onClose()
@@ -1349,19 +1360,19 @@ const CarSelectionPopup = ({
   }
 
   const getModels = () => {
-    return selectedBrand ? getModelsByBrand(selectedBrand) : []
+    if (!selectedBrand) return []
+    return getModelsForBrand(selectedBrand)
   }
 
   const getVariants = () => {
     if (!selectedBrand || !selectedModel) return []
-    const variants = getVariantsByBrandAndModel(selectedBrand, selectedModel)
-    return variants.map(v => v.name)
+    return getVariantsForBrandModel(selectedBrand, selectedModel)
   }
 
   // Filter brands by search query
   const filteredBrands = searchQuery.trim() 
-    ? brands.filter(b => b.toLowerCase().includes(searchQuery.toLowerCase()))
-    : brands
+    ? getBrands().filter(b => b.toLowerCase().includes(searchQuery.toLowerCase()))
+    : getBrands()
 
   // Filter models by search query
   const filteredModels = searchQuery.trim() 
@@ -1401,10 +1412,10 @@ const CarSelectionPopup = ({
           </div>
         </div>
 
-        {/* Brand List - Clean vertical list like in the image */}
+        {/* Brand List - Clean vertical list */}
         <div className="space-y-0.5 max-h-52 overflow-y-auto custom-scrollbar pr-1">
           {filteredBrands.map((brand) => {
-            const hasModels = getModelsByBrand(brand).length > 0
+            const hasModels = getModelsForBrand(brand).length > 0
             return (
               <button
                 key={brand}
@@ -1421,7 +1432,7 @@ const CarSelectionPopup = ({
                 <span>{brand}</span>
                 {hasModels && (
                   <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                    {getModelsByBrand(brand).length} models
+                    {getModelsForBrand(brand).length} models
                   </span>
                 )}
               </button>
@@ -1561,7 +1572,11 @@ const CarSelectionPopup = ({
         {/* Variants List - Clean vertical list */}
         <div className="space-y-0.5 max-h-52 overflow-y-auto custom-scrollbar pr-1">
           {filteredVariants.map((variant) => {
-            const car = getCarByBrandModelVariant(selectedBrand, selectedModel, variant)
+            const car = carsData?.find(c => 
+              c.brand === selectedBrand && 
+              c.model === selectedModel && 
+              c.variant === variant
+            )
             return (
               <button
                 key={variant}
@@ -1802,6 +1817,12 @@ const AddCarButton = ({ onClick, isDark }) => {
 const CompareCars = () => {
   const { isDark } = useTheme()
   
+  // State for car data from API
+  const [carsData, setCarsData] = useState([])
+  const [brandsData, setBrandsData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [dataError, setDataError] = useState(null)
+  
   const [car1Id, setCar1Id] = useState(null)
   const [car2Id, setCar2Id] = useState(null)
   const [showPopup1, setShowPopup1] = useState(false)
@@ -1816,8 +1837,68 @@ const CompareCars = () => {
   const addCarRef1 = useRef(null)
   const addCarRef2 = useRef(null)
 
-  const car1 = car1Id ? getAllCars().find(c => c.id === car1Id) : null
-  const car2 = car2Id ? getAllCars().find(c => c.id === car2Id) : null
+  // Fetch car data from API
+  useEffect(() => {
+    const fetchCarData = async () => {
+      try {
+        setLoading(true)
+        setDataError(null)
+        
+        // Get all cars
+        const carResult = await api.getAllCars()
+        if (carResult.success) {
+          // Flatten the data
+          const flattenedCars = []
+          carResult.data.forEach(brand => {
+            brand.models.forEach(model => {
+              model.variants.forEach(variant => {
+                flattenedCars.push({
+                  id: `${brand.brand}-${model.name}-${variant.name}`,
+                  brand: brand.brand,
+                  model: model.name,
+                  variant: variant.name,
+                  slug: model.slug,
+                  image: model.image,
+                  price: variant.price,
+                  overallScore: variant.overallScore || 0,
+                  scores: variant.scores || null,
+                  factorScores: variant.factorScores || null,
+                })
+              })
+            })
+          })
+          setCarsData(flattenedCars)
+          
+          // Get brands
+          const brandResult = await api.getAllBrands()
+          if (brandResult.success) {
+            setBrandsData(brandResult.data.map(b => b.name))
+          } else {
+            // Extract brands from cars data as fallback
+            const uniqueBrands = [...new Set(flattenedCars.map(c => c.brand))]
+            setBrandsData(uniqueBrands)
+          }
+        } else {
+          setDataError(carResult.message || 'Failed to load car data')
+        }
+      } catch (error) {
+        console.error('❌ Error fetching car data:', error)
+        setDataError('Network error. Please try again.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchCarData()
+  }, [])
+
+  // Get car by ID from carsData
+  const getCarById = (id) => {
+    return carsData.find(c => c.id === id) || null
+  }
+
+  const car1 = car1Id ? getCarById(car1Id) : null
+  const car2 = car2Id ? getCarById(car2Id) : null
 
   const handleCarSelect = (position, car) => {
     if (position === 1) {
@@ -1865,9 +1946,8 @@ const CompareCars = () => {
   }
 
   const handlePopularCompare = (id1, id2) => {
-    const allCars = getAllCars()
-    const car1Data = allCars.find(c => c.id === id1)
-    const car2Data = allCars.find(c => c.id === id2)
+    const car1Data = getCarById(id1)
+    const car2Data = getCarById(id2)
     
     if (car1Data && car2Data) {
       setCar1Id(id1)
@@ -1885,6 +1965,50 @@ const CompareCars = () => {
       }, 1500)
     }
   }
+
+  // Popular comparisons with proper IDs from API data
+  const popularComparisons = [
+    {
+      id: 1,
+      car1Id: 'Hyundai-Creta-SX(O) 1.5 Diesel AT',
+      car2Id: 'Kia-Seltos-GTX+ 1.5 Diesel AT',
+      title: "Creta vs Seltos",
+      car1Name: "Creta",
+      car2Name: "Seltos",
+      car1Brand: "Hyundai",
+      car2Brand: "Kia"
+    },
+    {
+      id: 2,
+      car1Id: 'Hyundai-Creta-SX(O) 1.5 Diesel AT',
+      car2Id: 'Suzuki-Grand Vitara-Zeta+ Smart Hybrid',
+      title: "Creta vs Grand Vitara",
+      car1Name: "Creta",
+      car2Name: "Grand Vitara",
+      car1Brand: "Hyundai",
+      car2Brand: "Suzuki"
+    },
+    {
+      id: 3,
+      car1Id: 'Tata-Nexon-Fearless Plus 1.5 Diesel',
+      car2Id: 'Suzuki-Brezza-ZXi+ 1.5 Petrol',
+      title: "Nexon vs Brezza",
+      car1Name: "Nexon",
+      car2Name: "Brezza",
+      car1Brand: "Tata",
+      car2Brand: "Suzuki"
+    },
+    {
+      id: 4,
+      car1Id: 'Mahindra-XUV700-AX7L 2.0 Diesel AT',
+      car2Id: 'Kia-Seltos-GTX+ 1.5 Diesel AT',
+      title: "XUV700 vs Seltos",
+      car1Name: "XUV700",
+      car2Name: "Seltos",
+      car1Brand: "Mahindra",
+      car2Brand: "Kia"
+    }
+  ]
 
   // Sections
   const sections = [
@@ -2088,6 +2212,37 @@ const CompareCars = () => {
     return 'bg-red-500'
   }
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center pt-20 ${isDark ? 'bg-dark-950' : 'bg-gray-50'}`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
+          <p className={`mt-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            Loading car data...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (dataError) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center pt-20 ${isDark ? 'bg-dark-950' : 'bg-gray-50'}`}>
+        <div className="text-center">
+          <p className="text-red-500">{dataError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold py-2 px-6 rounded-lg transition-all duration-300"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Loading Modal
   if (showLoadingModal) {
     return (
@@ -2122,7 +2277,7 @@ const CompareCars = () => {
 
   return (
     <>
-      {/* Hero Section */}
+      {/* Hero Section - UNCHANGED */}
       <section className="relative pt-32 pb-20 bg-gradient-to-r from-gray-900 to-gray-800 text-white overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
@@ -2148,7 +2303,7 @@ const CompareCars = () => {
         </div>
       </section>
 
-      {/* Car Selection */}
+      {/* Car Selection - UNCHANGED */}
       {!isComparing && (
         <section className={`py-12 border-b transition-colors duration-300 relative -mt-6 ${
           isDark ? 'bg-dark-900 border-dark-700' : 'bg-gray-50 border-gray-200'
@@ -2222,7 +2377,7 @@ const CompareCars = () => {
                 </div>
               </div>
 
-              {/* Compare Button */}
+              {/* Compare Button - UNCHANGED */}
               <div className="text-center mt-8">
                 <motion.button
                   whileHover={car1 && car2 ? { scale: 1.05 } : {}}
@@ -2251,7 +2406,7 @@ const CompareCars = () => {
         </section>
       )}
 
-      {/* Popups - Anchored to buttons */}
+      {/* Popups - UNCHANGED */}
       <CarSelectionPopup
         isOpen={showPopup1}
         onClose={() => setShowPopup1(false)}
@@ -2259,6 +2414,8 @@ const CompareCars = () => {
         position={1}
         isDark={isDark}
         anchorRef={addCarRef1}
+        carsData={carsData}
+        brandsData={brandsData}
       />
       <CarSelectionPopup
         isOpen={showPopup2}
@@ -2267,9 +2424,11 @@ const CompareCars = () => {
         position={2}
         isDark={isDark}
         anchorRef={addCarRef2}
+        carsData={carsData}
+        brandsData={brandsData}
       />
 
-      {/* Comparison Results */}
+      {/* Comparison Results - UNCHANGED (Only uses car1 and car2 which now come from API) */}
       {isComparing && showComparison && car1 && car2 && (
         <section id="comparison-results" className={`py-16 transition-colors duration-300 ${isDark ? 'bg-dark-900' : 'bg-gray-50'}`}>
           <div className="container-custom">
@@ -2748,7 +2907,7 @@ const CompareCars = () => {
                 </AnimatePresence>
               </div>
 
-              {/* Quick Summary Cards */}
+              {/* Quick Summary Cards - UNCHANGED */}
               <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className={`p-4 rounded-xl border transition-colors duration-300 ${
                   isDark ? 'bg-green-900/20 border-green-800/30' : 'bg-green-50 border-green-200'
@@ -2809,7 +2968,7 @@ const CompareCars = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons - UNCHANGED */}
               <div className="mt-8 flex flex-wrap gap-4 justify-center">
                 <button
                   onClick={() => {
@@ -2846,7 +3005,7 @@ const CompareCars = () => {
         </section>
       )}
 
-      {/* Popular Comparisons */}
+      {/* Popular Comparisons - UNCHANGED */}
       <section className={`py-12 md:py-16 transition-colors duration-300 ${
         isComparing && showComparison 
           ? isDark ? 'bg-dark-900 border-t border-dark-700' : 'bg-white border-t border-gray-200'
@@ -2866,9 +3025,8 @@ const CompareCars = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             {popularComparisons.map((comparison) => {
-              const allCars = getAllCars()
-              const car1Data = allCars.find(c => c.id === comparison.car1Id)
-              const car2Data = allCars.find(c => c.id === comparison.car2Id)
+              const car1Data = getCarById(comparison.car1Id)
+              const car2Data = getCarById(comparison.car2Id)
               if (!car1Data || !car2Data) return null
               return (
                 <motion.button

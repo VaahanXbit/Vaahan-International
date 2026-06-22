@@ -4,6 +4,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/authRoutes');
+const articleRoutes = require('./routes/articleRoutes');
+const carRoutes = require('./routes/carRoutes');
 const connectDB = require('./config/database');
 
 // Connect to MongoDB
@@ -22,7 +24,6 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// ✅ FIXED CORS - Allow multiple origins
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
@@ -53,6 +54,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/articles', articleRoutes);
+app.use('/api/cars', carRoutes);
+
 
 // Health check
 app.get('/health', (req, res) => {
