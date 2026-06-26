@@ -28,29 +28,43 @@ def chunk_article(article):
     soup = BeautifulSoup(content_html, "html.parser")
 
     sections = []
-    current_heading = article["title"]
-    current_content = []
+    
+    # Check if there are any paragraph or heading tags in the content
+    has_html_structure = soup.find(["h2", "h3", "p", "ul", "li"]) is not None
 
-    for element in soup.find_all(["h2", "h3", "p", "ul", "li"]):
-        if element.name in ["h2", "h3"]:
-            if current_content:
-                sections.append(
-                    f"{current_heading}. {' '.join(current_content)}"
-                )
+    if has_html_structure:
+        current_heading = article["title"]
+        current_content = []
 
-            current_heading = element.get_text(strip=True)
-            current_content = []
+        for element in soup.find_all(["h2", "h3", "p", "ul", "li"]):
+            if element.name in ["h2", "h3"]:
+                if current_content:
+                    sections.append(
+                        f"{current_heading}. {' '.join(current_content)}"
+                    )
 
-        else:
-            text = element.get_text(" ", strip=True)
+                current_heading = element.get_text(strip=True)
+                current_content = []
 
-            if len(text) > 20:
-                current_content.append(text)
+            else:
+                text = element.get_text(" ", strip=True)
 
-    if current_content:
-        sections.append(
-            f"{current_heading}. {' '.join(current_content)}"
-        )
+                if len(text) > 20:
+                    current_content.append(text)
+
+        if current_content:
+            sections.append(
+                f"{current_heading}. {' '.join(current_content)}"
+            )
+    else:
+        # Fallback for plain text (e.g., extracted from PDF)
+        # Split by double newlines to identify paragraphs
+        paragraphs = [p.strip() for p in re.split(r'\n\s*\n', content_html) if p.strip()]
+        for p in paragraphs:
+            # Clean single newlines inside paragraph to keep it cohesive
+            cleaned_p = re.sub(r'\s+', ' ', p).strip()
+            if len(cleaned_p) > 20:
+                sections.append(cleaned_p)
 
     chunks = []
 
