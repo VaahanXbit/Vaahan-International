@@ -7,13 +7,16 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from typing import Optional, List
-from rag.retriever import retrieve
+from rag.retriever import retrieve, cosine_similarity
+from rag.embedder import embed_query
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from llm.prompt_builder import build_prompt, build_rewrite_prompt, check_small_talk, build_small_talk_prompt
 from llm.llm_service import generate
+from db.mongodb import cache_collection
+from datetime import datetime
 
 app = FastAPI(
     title="Vaahan AI Mode API",
@@ -79,6 +82,8 @@ async def ai_mode(request: QueryRequest):
     if len(query) > 500:
         raise HTTPException(status_code=400, detail="Query too long")
 
+    search_query = query
+
     # Step 1: Slice history to keep last 6 messages (3 turns) to prevent prompt bloat
     sliced_history = request.history[-6:]
     history_list = [
@@ -112,6 +117,58 @@ async def ai_mode(request: QueryRequest):
             except Exception as e:
                 print(f"[WARNING] Query rewriting failed: {e}. Falling back to original query.")
 
+        # Check MongoDB Cache for the resolved standalone query
+        normalized_query = search_query.lower().strip("?!. \t,")
+        try:
+            # Try Exact Match first (fastest)
+            cached_entry = cache_collection.find_one({"query": normalized_query})
+            
+            # If not exact match, try Semantic Match
+            if not cached_entry:
+                query_vector = embed_query(search_query)[0].tolist()
+                candidates = list(cache_collection.find({}, {"query": 1, "embedding": 1, "response": 1}))
+                
+                best_match = None
+                highest_sim = 0.0
+                for cand in candidates:
+                    cand_vector = cand.get("embedding")
+                    if cand_vector:
+                        sim = cosine_similarity(query_vector, cand_vector)
+                        if sim > highest_sim:
+                            highest_sim = sim
+                            best_match = cand
+                
+                # If similarity is 0.85 or higher, treat it as a semantic cache hit
+                if highest_sim >= 0.85 and best_match:
+                    print(f"[SUCCESS] Semantic cache hit (similarity: {highest_sim:.4f}) for: '{search_query}' matching cached query '{best_match['query']}'.")
+                    cached_entry = best_match
+
+            if cached_entry:
+                print(f"[SUCCESS] Cache hit resolved for query: '{search_query}'. Serving response from DB cache.")
+                try:
+                    cache_collection.update_one(
+                        {"_id": cached_entry["_id"]},
+                        {
+                            "$inc": {"hits": 1},
+                            "$set": {"last_accessed_at": datetime.utcnow()}
+                        }
+                    )
+                except Exception as e:
+                    print(f"[WARNING] Failed to update cache hit stats: {e}")
+                
+                cached_res = cached_entry["response"]
+                return AIResponse(
+                    reasoning=cached_res.get("reasoning", ""),
+                    pros=cached_res.get("pros", []),
+                    cons=cached_res.get("cons", []),
+                    verdict=cached_res.get("verdict", ""),
+                    sources=cached_res.get("sources", []),
+                    has_answer=cached_res.get("has_answer", True),
+                    is_small_talk=cached_res.get("is_small_talk", False)
+                )
+        except Exception as e:
+            print(f"[WARNING] Cache lookup failed: {e}")
+
         # Step 3: Retrieve relevant chunks using the (possibly rewritten) search query
         chunks = retrieve(search_query, top_k=5)
 
@@ -133,6 +190,23 @@ async def ai_mode(request: QueryRequest):
             result["is_small_talk"] = check_small_talk(query)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to parse AI response")
+
+    # If it was a RAG query (not small talk), save the successfully parsed response to cache
+    if not result.get("is_small_talk"):
+        try:
+            norm_q = search_query.lower().strip("?!. \t,")
+            query_vector = embed_query(search_query)[0].tolist()
+            cache_collection.insert_one({
+                "query": norm_q,
+                "embedding": query_vector,
+                "response": result,
+                "hits": 1,
+                "createdAt": datetime.utcnow(),
+                "last_accessed_at": datetime.utcnow()
+            })
+            print(f"[SUCCESS] Successfully cached query response for: '{search_query}'")
+        except Exception as e:
+            print(f"[WARNING] Failed to save query response to cache: {e}")
 
     # Step 5: Background Evaluation (prints to terminal)
     if not result.get("is_small_talk"):
