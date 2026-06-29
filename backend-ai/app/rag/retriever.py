@@ -30,7 +30,7 @@ def retrieve(query, top_k=5):
     query_vector = embed_query(query)[0].tolist()
     vector_results = []
 
-    candidate_limit = top_k * 3
+    candidate_limit = 8
     try:
         pipeline = [
             {

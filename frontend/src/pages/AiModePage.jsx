@@ -45,6 +45,30 @@ const AiModePage = () => {
     localStorage.setItem('vaahan_chat_history', JSON.stringify(messages))
   }, [messages])
 
+  // Rotate loading messages to decrease perceived latency
+  const [loadingText, setLoadingText] = useState("Analyzing your query...")
+  useEffect(() => {
+    if (!loading) return
+
+    const steps = [
+      "Analyzing your query...",
+      "Searching Vaahan's knowledge base...",
+      "Retrieving automotive articles...",
+      "Synthesizing specifications...",
+      "Formulating verdict..."
+    ]
+    
+    let index = 0
+    setLoadingText(steps[0])
+
+    const interval = setInterval(() => {
+      index = (index + 1) % steps.length
+      setLoadingText(steps[index])
+    }, 1100)
+
+    return () => clearInterval(interval)
+  }, [loading])
+
   const suggestions = [
     'Is AWD worth it for city driving in India?',
     'Can Your FWD Car Handle Spiti in Winter?',
@@ -186,8 +210,8 @@ const AiModePage = () => {
           {messages.length > 0 && (
             <div className="max-w-3xl mx-auto w-full flex flex-col space-y-6">
               
-              {/* Clear History Button */}
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-[#2f3032]/40">
+              {/* Clear History Button (Sticky Header) */}
+              <div className="sticky top-[88px] z-10 flex justify-between items-center bg-slate-50/90 dark:bg-[#131314]/90 backdrop-blur-sm pb-2.5 border-b border-slate-200 dark:border-[#2f3032]/40 pt-2.5 transition-colors duration-200">
                 <span className="text-[10px] text-slate-400 dark:text-gray-500 font-bold uppercase tracking-wider">Conversation History</span>
                 <button 
                   onClick={handleNewChat}
@@ -310,7 +334,9 @@ const AiModePage = () => {
                 <div className="flex flex-col items-start space-y-2 bg-white dark:bg-[#1e1f20]/30 border border-slate-200 dark:border-[#2f3032]/40 rounded-2xl p-6 shadow-md dark:shadow-sm w-full">
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-5 h-5 text-yellow-600 dark:text-yellow-500 animate-spin" />
-                    <p className="text-xs text-slate-500 dark:text-gray-400 animate-pulse font-medium">Synthesizing Answer...</p>
+                    <p className="text-xs text-slate-500 dark:text-gray-400 font-medium transition-all duration-300">
+                      {loadingText}
+                    </p>
                   </div>
                 </div>
               )}

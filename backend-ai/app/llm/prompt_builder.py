@@ -94,24 +94,26 @@ INSTRUCTIONS:
      - "reasoning": A clear step-by-step or descriptive explanation of the procedure (4-5 sentences).
      - "pros" & "cons": Keep as empty arrays [] since pros/cons do not apply to how-to instructions.
 
-2. STABILITY & TRUTH:
-   - Answer ONLY using the provided context. Do NOT make up facts or use external internet knowledge.
-   - Use the CONVERSATION HISTORY to understand the context of follow-up questions (e.g., if the user asks "is it safe?", "it" refers to the topic of the previous question).
-   - If the context does not contain the answer or the query is completely irrelevant:
+2. STABILITY & TRUTH (CRITICAL BOUNDARIES):
+   - You must act strictly as a RAG (Retrieval-Augmented) system. Answer ONLY using the provided VAAHAN context. Do NOT make up facts, and do NOT use your general pre-trained knowledge to answer questions that are not present in the provided context.
+   - Use the CONVERSATION HISTORY to resolve follow-up context.
+   - If the user query is completely irrelevant to automotive topics (e.g., asking about cricketers, actors, movies, general history, geography, science) or if the provided context does not contain the answer:
+     - You MUST refuse to answer using general knowledge.
      - Set "verdict" to "I couldn't find relevant information in Vaahan's knowledge base."
      - Set "has_answer" to false.
-     - Set "reasoning" to a brief explanation of what is missing.
+     - Set "reasoning" to a brief statement explaining that the topic (e.g. "Sachin") is outside the scope of Vaahan's automotive database.
+     - Do NOT provide any factual answer from your general pre-trained knowledge (e.g. do NOT say who Sachin is or describe his career).
      - Set "pros" and "cons" to [].
 
 Respond STRICTLY in JSON format (do not wrap in markdown or backticks, do not include any text before or after the JSON):
-{{
-  "reasoning": "Detailed, engaging explanation matching the query type (4-5 sentences)",
+{
+  "reasoning": "Explanation matching the query type or why the topic is out of scope (4-5 sentences)",
   "pros": ["pro 1", "pro 2"] or [],
   "cons": ["con 1", "con 2"] or [],
-  "verdict": "One-line recommendation, definition, or summary",
+  "verdict": "One-line recommendation, definition, or 'I couldn't find relevant information in Vaahan's knowledge base.'",
   "sources": {sources_json},
-  "has_answer": true
-}}"""
+  "has_answer": true or false
+}"""
 
     return prompt
 
@@ -132,12 +134,12 @@ def build_rewrite_prompt(query: str, history: list) -> str:
 
     prompt = f"""You are an expert search query generator.
 Given a conversation history between a User and an AI, and a new follow-up question from the User, rewrite the follow-up question to be a standalone, search-friendly query.
-The standalone query should contain all the necessary context from the history so it can be used for search and document retrieval.
 
 RULES:
-1. If the follow-up question refers to a topic or pronoun in the history (e.g. "why?", "is it safe?", "in short?", "explain more", "compared to what?"), rewrite it to be fully self-contained and descriptive (e.g., "why are hydrogen fuel cell trucks not widely adopted?", "is hydrogen fuel cell truck safe?", "hydrogen fuel cell truck summary").
-2. If the follow-up question is already standalone and does not need any context from the history, output the original question exactly.
-3. Output ONLY the standalone query. Do not add any introduction, explanations, quotes, markdown formatting, or notes.
+1. DETECT TOPIC SHIFTS (CRITICAL): If the follow-up question is about a completely different topic than the conversation history (e.g. history is about Spiti tyres, but the new question is "E20", "PHEV", or "what is ADAS"), you MUST recognize this as a topic shift. Do NOT merge them. Output the new follow-up question exactly as-is (e.g. "E20" or "PHEV").
+2. CONTEXT RESOLUTION: Only rewrite the query if the follow-up question directly refers to or relies on a topic or pronoun in the history (e.g. "why?", "is it safe?", "in short?", "explain more", "compared to what?", "is it worth it?"). In such cases, rewrite it to be fully self-contained and descriptive (e.g., "why are hydrogen fuel cell trucks not widely adopted?", "is hydrogen fuel cell truck safe?").
+3. NO FORCE-MERGING: Never append words or context from the history if the follow-up is already an independent keyword or term.
+4. Output ONLY the standalone query. Do not add any introduction, explanations, quotes, markdown formatting, or notes.
 
 CONVERSATION HISTORY:
 {history_text}
