@@ -10,32 +10,32 @@ MOCK_MODE = False
 
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-def generate(prompt: str) -> str:
+def generate(prompt: str, max_tokens: int = 800) -> str:
     if MOCK_MODE:
         return '''{
-          "reasoning": "Based on Vaahan knowledge base analysis of Indian driving conditions.",
+          "reasoning": "Based on DryvSquad knowledge base analysis of Indian driving conditions.",
           "pros": ["Relevant pro from knowledge base"],
           "cons": ["Relevant con from knowledge base"],
-          "verdict": "Mock verdict. Set MOCK MODE=false for real answers.",
+          "verdict": "Mock verdict. Set MOCK_MODE=false for real answers.",
           "sources": [],
           "has_answer": true
         }'''
     try:
         print("[INFO] Attempting answer generation with Groq...")
-        return generate_with_groq(prompt)
+        return generate_with_groq(prompt, max_tokens)
     except Exception as e_groq:
         print(f"[WARNING] Groq failed: {e_groq}. Trying Gemini...")
         try:
-            return generate_with_gemini(prompt)
+            return generate_with_gemini(prompt, max_tokens)
         except Exception as e:
             print(f"[WARNING] Gemini failed: {e}. Trying OpenAI...")
             try:
-                return generate_with_openai(prompt)
+                return generate_with_openai(prompt, max_tokens)
             except Exception as e2:
                 raise Exception(f"All LLMs failed. Groq: {e_groq}. Gemini: {e}. OpenAI: {e2}")
 
 
-def generate_with_groq(prompt: str) -> str:
+def generate_with_groq(prompt: str, max_tokens: int = 800) -> str:
     from groq import Groq
     
     api_key = os.getenv("GROQ_API_KEY")
@@ -49,7 +49,8 @@ def generate_with_groq(prompt: str) -> str:
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
+            temperature=0.3,
+            max_tokens=max_tokens
         )
         result = completion.choices[0].message.content
         print("[SUCCESS] Answered using Groq (llama-3.3-70b-versatile) with API key from: GROQ_API_KEY")
@@ -59,14 +60,15 @@ def generate_with_groq(prompt: str) -> str:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
+            temperature=0.3,
+            max_tokens=max_tokens
         )
         result = completion.choices[0].message.content
         print("[SUCCESS] Answered using Groq (llama-3.1-8b-instant) with API key from: GROQ_API_KEY")
         return result
 
 
-def generate_with_gemini(prompt: str) -> str:
+def generate_with_gemini(prompt: str, max_tokens: int = 800) -> str:
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -75,7 +77,7 @@ def generate_with_gemini(prompt: str) -> str:
                 contents=prompt,
                 config=genai.types.GenerateContentConfig(
                     temperature=0.3,
-                    max_output_tokens=1000,
+                    max_output_tokens=max_tokens,
                 )
             )
             result = response.text
@@ -91,13 +93,14 @@ def generate_with_gemini(prompt: str) -> str:
             raise
 
 
-def generate_with_openai(prompt: str) -> str:
+def generate_with_openai(prompt: str, max_tokens: int = 800) -> str:
     from openai import OpenAI
     api_key = os.getenv("OPENAI_API_KEY", "")
     client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
         model="gpt-4.1-mini",
-        messages=[{"role": "user", "content": prompt}]
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=max_tokens
     )
     result = response.choices[0].message.content
     print("[SUCCESS] Answered using OpenAI (gpt-4.1-mini) with API key from: OPENAI_API_KEY")

@@ -44,7 +44,7 @@ const AiSidebar = ({
           <div className="flex items-center gap-2.5">
             {/* <span className="text-xl animate-pulse">✨</span> */}
             <div>
-              <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">Vaahan Advisor</h3>
+              <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">DryvSquad AI</h3>
             </div>
           </div>
           <button
@@ -73,7 +73,7 @@ const AiSidebar = ({
             <div className="space-y-6 py-4 text-center">
               
               <div>
-                <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-1.5">Ask Vaahan AI</h4>
+                <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-1.5">Ask DryvSquad AI</h4>
                 {/* <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
                   Get instant, objective advice on Indian cars, specs, and road conditions sourced directly from our knowledge base.
                 </p> */}
@@ -204,7 +204,7 @@ const AiSidebar = ({
               {!isRelevant && (
                 <div className="bg-gray-50 dark:bg-gray-800/40 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-800">
                   <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-3">
-                    No specific documentation matches this query in the Vaahan Knowledge base.
+                    No specific documentation matches this query in the DryvSquad Knowledge base.
                   </p>
                   <Link
                     to={`/articles?search=${encodeURIComponent(query)}`}

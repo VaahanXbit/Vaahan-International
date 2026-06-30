@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .env
 *.faiss
+.gemini/
+tests/local_test_*.py

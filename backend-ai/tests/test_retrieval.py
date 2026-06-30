@@ -10,7 +10,7 @@ sys.path.append(
 
 from app.rag.retriever import retrieve
 
-query = "Which ADAS feature is useful for lane keeping and lane departure warning?"
+query = "5000"
 
 results = retrieve(query)
 

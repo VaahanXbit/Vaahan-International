@@ -6,16 +6,20 @@ import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from rag.retriever import retrieve
+from typing import Optional, List
+from rag.retriever import retrieve, cosine_similarity
+from rag.embedder import embed_query
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from llm.prompt_builder import build_prompt
+from llm.prompt_builder import build_prompt, build_rewrite_prompt, check_small_talk, build_small_talk_prompt
 from llm.llm_service import generate
+from db.mongodb import cache_collection, articles_collection
+from datetime import datetime
 
 app = FastAPI(
-    title="Vaahan AI Mode API",
+    title="DryvSquad AI Mode API",
     description="RAG-powered automotive knowledge assistant",
     version="1.0.0"
 )
@@ -23,15 +27,27 @@ app = FastAPI(
 # CORS -> allow React frontend to call this API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+class ChatMessage(BaseModel):
+    sender: str
+    text: Optional[str] = ""
+    result: Optional[dict] = None
+
+
 class QueryRequest(BaseModel):
     query: str
+    history: List[ChatMessage] = []
 
 
 class Source(BaseModel):
@@ -48,16 +64,17 @@ class AIResponse(BaseModel):
     verdict: str
     sources: list[dict]
     has_answer: bool
+    is_small_talk: Optional[bool] = False
 
 
 @app.get("/")
 def root():
-    return {"status": "Vaahan AI Mode API is running"}
+    return {"status": "DryvSquad AI Mode API is running"}
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "vaahan-ai"}
+    return {"status": "ok", "service": "dryvsquad-ai"}
 
 
 @app.post("/api/ai-mode", response_model=AIResponse)
@@ -70,94 +87,133 @@ async def ai_mode(request: QueryRequest):
     if len(query) > 500:
         raise HTTPException(status_code=400, detail="Query too long")
 
-    # Step 1: Retrieve relevant chunks
-    chunks = retrieve(query, top_k=5)
+    search_query = query
 
-    # Step 2: Build prompt
-    prompt = build_prompt(query, chunks)
+    # Step 1: Slice history to keep last 2 messages (1 turn) to prevent prompt bloat and context bleed
+    sliced_history = request.history[-2:]
+    history_list = [
+        {
+            "sender": h.sender,
+            "text": h.text or "",
+            "result": h.result
+        }
+        for h in sliced_history
+    ]
 
-    # Step 3: Generate answer
-    try:
-        raw_response = generate(prompt)
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"AI service unavailable: {str(e)}")
+    # Check for general small talk / greetings (bypasses RAG retrieval)
+    if check_small_talk(query):
+        print(f"[INFO] Detected small talk query: '{query}'. Bypassing retrieval.")
+        prompt = build_small_talk_prompt(query, history=history_list)
+        try:
+            raw_response = generate(prompt)
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"AI service unavailable: {str(e)}")
+    else:
+        # Step 2: Query rewriting for conversational follow-ups
+        search_query = query
+        if history_list:
+            try:
+                rewrite_prompt = build_rewrite_prompt(query, history_list)
+                raw_rewrite = generate(rewrite_prompt, max_tokens=80)
+                cleaned_rewrite = raw_rewrite.strip().strip('"').strip("'").strip()
+                if cleaned_rewrite and len(cleaned_rewrite) < 150:
+                    search_query = cleaned_rewrite
+                    print(f"[INFO] Conversational query '{query}' rewritten to: '{search_query}'")
+            except Exception as e:
+                print(f"[WARNING] Query rewriting failed: {e}. Falling back to original query.")
+
+        # Check MongoDB Cache for the resolved standalone query
+        normalized_query = search_query.lower().strip("?!. \t,")
+        try:
+            # Try Exact Match first (fastest)
+            cached_entry = cache_collection.find_one({"query": normalized_query})
+            
+            # If not exact match, try Semantic Match
+            if not cached_entry:
+                query_vector = embed_query(search_query)[0].tolist()
+                candidates = list(cache_collection.find({}, {"query": 1, "embedding": 1, "response": 1}))
+                
+                best_match = None
+                highest_sim = 0.0
+                for cand in candidates:
+                    cand_vector = cand.get("embedding")
+                    if cand_vector:
+                        sim = cosine_similarity(query_vector, cand_vector)
+                        if sim > highest_sim:
+                            highest_sim = sim
+                            best_match = cand
+                
+                # If similarity is 0.85 or higher, treat it as a semantic cache hit
+                if highest_sim >= 0.85 and best_match:
+                    print(f"[SUCCESS] Semantic cache hit (similarity: {highest_sim:.4f}) for: '{search_query}' matching cached query '{best_match['query']}'.")
+                    cached_entry = best_match
+
+            if cached_entry:
+                print(f"[SUCCESS] Cache hit resolved for query: '{search_query}'. Serving response from DB cache.")
+                try:
+                    cache_collection.update_one(
+                        {"_id": cached_entry["_id"]},
+                        {
+                            "$inc": {"hits": 1},
+                            "$set": {"last_accessed_at": datetime.utcnow()}
+                        }
+                    )
+                except Exception as e:
+                    print(f"[WARNING] Failed to update cache hit stats: {e}")
+                
+                cached_res = cached_entry["response"]
+                return AIResponse(
+                    reasoning=cached_res.get("reasoning", ""),
+                    pros=cached_res.get("pros", []),
+                    cons=cached_res.get("cons", []),
+                    verdict=cached_res.get("verdict", ""),
+                    sources=cached_res.get("sources", []),
+                    has_answer=cached_res.get("has_answer", True),
+                    is_small_talk=cached_res.get("is_small_talk", False)
+                )
+        except Exception as e:
+            print(f"[WARNING] Cache lookup failed: {e}")
+
+        # Step 3: Retrieve relevant chunks using the (possibly rewritten) search query
+        chunks = retrieve(search_query, top_k=4)
+
+        # Step 4: Build prompt with original query and conversation history
+        prompt = build_prompt(query, chunks, history=history_list)
+
+        # Step 5: Generate answer
+        try:
+            raw_response = generate(prompt)
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"AI service unavailable: {str(e)}")
 
     # Step 4: Parse JSON response
     try:
         cleaned = raw_response.replace("```json", "").replace("```", "").strip()
         result = json.loads(cleaned)
+        # Ensure is_small_talk is set if we detected small talk
+        if "is_small_talk" not in result:
+            result["is_small_talk"] = check_small_talk(query)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to parse AI response")
 
-    # Step 5: Background Evaluation (prints to terminal)
-    try:
-        def compress_score(score):
-            if score >= 4.5:
-                return 4
-            elif score <= 1.5:
-                return 2
-            else:
-                return round(score)
+    # If it was a RAG query (not small talk), save the successfully parsed response to cache
+    if not result.get("is_small_talk"):
+        try:
+            norm_q = search_query.lower().strip("?!. \t,")
+            query_vector = embed_query(search_query)[0].tolist()
+            cache_collection.insert_one({
+                "query": norm_q,
+                "embedding": query_vector,
+                "response": result,
+                "hits": 1,
+                "createdAt": datetime.utcnow(),
+                "last_accessed_at": datetime.utcnow()
+            })
+            print(f"[SUCCESS] Successfully cached query response for: '{search_query}'")
+        except Exception as e:
+            print(f"[WARNING] Failed to save query response to cache: {e}")
 
-        retrieved_texts = "\n".join([f"- {c['title']}: {c['chunk_text']}" for c in chunks])
-        eval_prompt = f"""You are an objective auditor. Evaluate the RAG response on a 0-5 scale.
-        
-        USER QUERY: {query}
-        
-        RETRIEVED CONTEXT CHUNKS:
-        {retrieved_texts}
-        
-        GENERATED RESPONSE:
-        {json.dumps(result, indent=2)}
-        
-        EVALUATION RUBRIC:
-        1. Retrieval: Were correct chunks retrieved?
-        2. Accuracy: Factually supported by chunks?
-        3. Completeness: Covers important points?
-        4. Hallucination: Avoids unsupported claims?
-        
-        INSTRUCTIONS:
-        - Assign score from 0-5 for each metric.
-        - COMPRESS SCORES: Map extreme scores toward the center. Map 5 to 4, and 1 to 2. Avoid assigning 0, 1, or 5.
-        - Provide a short 1-sentence rationale for each score.
-        
-        Respond in JSON format:
-        {{
-          "retrieval": {{ "score": 2-4, "rationale": "Short summary" }},
-          "accuracy": {{ "score": 2-4, "rationale": "Short summary" }},
-          "completeness": {{ "score": 2-4, "rationale": "Short summary" }},
-          "hallucination": {{ "score": 2-4, "rationale": "Short summary" }}
-        }}"""
-        
-        eval_raw = generate(eval_prompt)
-        eval_clean = eval_raw.replace("```json", "").replace("```", "").strip()
-        eval_data = json.loads(eval_clean)
-        
-        total_score = 0
-        score_lines = []
-        for metric in ["retrieval", "accuracy", "completeness", "hallucination"]:
-            m_data = eval_data.get(metric, {"score": 3, "rationale": "N/A"})
-            comp = compress_score(float(m_data.get("score", 3)))
-            total_score += comp
-            score_lines.append(f"  {metric.capitalize()}: {comp}/5 - {m_data.get('rationale', '')[:100]}")
-            
-        ratings = {18: "Excellent", 15: "Good", 12: "Acceptable, but needs improvement"}
-        rating = "Retrieval or answer quality needs work"
-        for thresh, label in sorted(ratings.items(), reverse=True):
-            if total_score >= thresh:
-                rating = label
-                break
-                
-        print("\n" + "="*50)
-        print("            ONLINE QUERY EVALUATION")
-        print("="*50)
-        print(f"Query: {query}")
-        print("\n".join(score_lines))
-        print("-"*50)
-        print(f"TOTAL SCORE: {total_score}/20 ({rating})")
-        print("="*50 + "\n")
-    except Exception as e:
-        print(f"[WARNING] Evaluation audit failed: {e}")
+
 
     return AIResponse(
         reasoning=result.get("reasoning", ""),
@@ -165,5 +221,38 @@ async def ai_mode(request: QueryRequest):
         cons=result.get("cons", []),
         verdict=result.get("verdict", ""),
         sources=result.get("sources", []),
-        has_answer=result.get("has_answer", True)
+        has_answer=result.get("has_answer", True),
+        is_small_talk=result.get("is_small_talk", False)
     )
+
+
+def watch_mongodb_changes():
+    import threading
+    import time
+    from app.scripts.ingest_articles import ingest
+    
+    print("[CHANGESTREAM] Starting background MongoDB change stream listener...")
+    while True:
+        try:
+            # Watch for insertions, updates, and replacements on the articles collection
+            with articles_collection.watch() as stream:
+                for change in stream:
+                    op_type = change.get("operationType")
+                    if op_type in ["insert", "update", "replace"]:
+                        print(f"[CHANGESTREAM] Detected article '{op_type}' event. Triggering auto-ingestion...")
+                        try:
+                            ingest()
+                            print("[CHANGESTREAM] Auto-ingestion complete.")
+                        except Exception as e:
+                            print(f"[CHANGESTREAM ERROR] Failed during auto-ingestion: {e}")
+        except Exception as e:
+            # Sleep 10s and retry (graceful fallback if MongoDB is not running as a replica set)
+            print(f"[CHANGESTREAM WARNING] Connection lost or not a replica set: {e}. Retrying in 10 seconds...")
+            time.sleep(10)
+
+
+@app.on_event("startup")
+def startup_event():
+    import threading
+    thread = threading.Thread(target=watch_mongodb_changes, daemon=True)
+    thread.start()
