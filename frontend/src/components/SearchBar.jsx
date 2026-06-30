@@ -4,7 +4,7 @@ import { searchArticles } from '../data/articlesData'
 
 const SearchBar = () => {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState([])
+  const [articleResults, setArticleResults] = useState([])
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -23,19 +23,29 @@ const SearchBar = () => {
 
   // Normal search logic
   useEffect(() => {
-    if (query.length >= 2) {
-      setIsLoading(true)
-      const timeout = setTimeout(() => {
-        const searchResults = searchArticles(query)
-        setResults(searchResults.slice(0, 5))
-        setIsOpen(true)
-        setIsLoading(false)
-      }, 300)
-      return () => clearTimeout(timeout)
-    } else {
-      setResults([])
-      setIsOpen(false)
+    const performSearch = async () => {
+      if (query.length >= 2) {
+        setIsLoading(true)
+        setArticleResults([])
+
+        try {
+          // Search articles strictly from the knowledge base
+          const articleData = await searchArticles(query)
+          setArticleResults(articleData.slice(0, 5))
+          setIsOpen(true)
+        } catch (error) {
+          console.error('❌ Search error:', error)
+        } finally {
+          setIsLoading(false)
+        }
+      } else {
+        setArticleResults([])
+        setIsOpen(false)
+      }
     }
+
+    const timeout = setTimeout(performSearch, 300)
+    return () => clearTimeout(timeout)
   }, [query])
 
   const handleSearch = (e) => {
@@ -70,6 +80,8 @@ const SearchBar = () => {
     }
   }
 
+  const totalResults = articleResults.length
+
   return (
     <div ref={searchRef} className="relative w-full max-w-2xl mx-auto">
       <form onSubmit={handleSearch}>
@@ -78,6 +90,8 @@ const SearchBar = () => {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search articles, technology, features..."
+            className="w-full px-5 py-4 pl-12 pr-16 rounded-xl border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-gray-800 placeholder-gray-400"
             placeholder="Search automotive articles (ABS, ADAS, AWD, Spiti, Tyres)..."
             className="w-full px-5 py-4 pl-12 pr-36 rounded-xl border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-gray-800 placeholder-gray-400 transition-all"
           />
@@ -105,57 +119,67 @@ const SearchBar = () => {
         </div>
       </form>
 
+      {/* Search Results Dropdown */}
+      {isOpen && totalResults > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden max-h-[500px] overflow-y-auto">
       {isOpen && results.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
           <div className="py-2">
-            <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+            <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-500">
-                {results.length} article{results.length !== 1 ? 's' : ''} found
+                {totalResults} result{totalResults !== 1 ? 's' : ''} found
+              </span>
+              <span className="text-xs text-gray-400">
+                <button 
+                  onClick={() => navigate(`/articles?search=${encodeURIComponent(query)}`)}
+                  className="text-yellow-600 hover:text-yellow-700 font-medium"
+                >
+                  View all →
+                </button>
               </span>
             </div>
-            {results.map((article) => (
-              <Link
-                key={article.id}
-                to={`/article/${article.slug}`}
-                onClick={handleResultClick}
-                className="block px-4 py-3 hover:bg-yellow-50 transition-colors group border-b border-gray-50 last:border-0"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${getCategoryColor(article.category)}`}>
-                        {article.category}
-                      </span>
-                      {article.readTime && (
-                        <span className="text-xs text-gray-400">{article.readTime}</span>
-                      )}
+
+            {/* Articles Section */}
+            {articleResults.length > 0 && (
+              <div>
+                {articleResults.map((article) => (
+                  <Link
+                    key={article.id}
+                    to={`/article/${article.slug}`}
+                    onClick={handleResultClick}
+                    className="block px-4 py-3 hover:bg-yellow-50 transition-colors group border-b border-gray-50 last:border-0"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${getCategoryColor(article.category)}`}>
+                            {article.category}
+                          </span>
+                          {article.readTime && (
+                            <span className="text-xs text-gray-400">{article.readTime}</span>
+                          )}
+                        </div>
+                        <h4 className="font-semibold text-gray-800 group-hover:text-yellow-600 transition-colors text-sm">
+                          {article.title}
+                        </h4>
+                        <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
+                          {article.excerpt}
+                        </p>
+                      </div>
+                      <svg className="w-4 h-4 text-gray-400 group-hover:text-yellow-500 group-hover:translate-x-1 transition-all ml-3 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
-                    <h4 className="font-semibold text-gray-800 group-hover:text-yellow-600 transition-colors">
-                      {article.title}
-                    </h4>
-                    <p className="text-sm text-gray-500 line-clamp-1 mt-1">
-                      {article.excerpt}
-                    </p>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-400 group-hover:text-yellow-500 group-hover:translate-x-1 transition-all ml-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </Link>
-            ))}
-            <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
-              <Link
-                to={`/articles?search=${encodeURIComponent(query)}`}
-                onClick={() => setIsOpen(false)}
-                className="text-sm text-yellow-600 hover:text-yellow-700 font-medium flex items-center justify-center gap-1"
-              >
-                View all results for "{query}" →
-              </Link>
-            </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
 
+      {/* No Results */}
+      {isOpen && query.length >= 2 && totalResults === 0 && (
       {isOpen && query.length >= 2 && results.length === 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 z-50 p-8 text-center">
           <div className="text-4xl mb-3">🔍</div>
@@ -163,6 +187,14 @@ const SearchBar = () => {
           <p className="text-sm text-gray-500 mb-3">
             We couldn't find any articles matching "{query}"
           </p>
+          <p className="text-xs text-gray-400">
+            Try searching for topics like: AWD, ADAS, Engine Oil, Tyres, ABS
+          </p>
+          <button
+            onClick={() => navigate(`/articles`)}
+            className="mt-3 text-sm text-yellow-600 hover:text-yellow-700 font-medium"
+          >
+            Browse all articles →
           <button
             onClick={() => {
               navigate(`/ai-mode?q=${encodeURIComponent(query)}`)
