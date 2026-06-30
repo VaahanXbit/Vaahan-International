@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from llm.prompt_builder import build_prompt, build_rewrite_prompt, check_small_talk, build_small_talk_prompt
 from llm.llm_service import generate
-from db.mongodb import cache_collection
+from db.mongodb import cache_collection, articles_collection
 from datetime import datetime
 
 app = FastAPI(
@@ -224,3 +224,35 @@ async def ai_mode(request: QueryRequest):
         has_answer=result.get("has_answer", True),
         is_small_talk=result.get("is_small_talk", False)
     )
+
+
+def watch_mongodb_changes():
+    import threading
+    import time
+    from app.scripts.ingest_articles import ingest
+    
+    print("[CHANGESTREAM] Starting background MongoDB change stream listener...")
+    while True:
+        try:
+            # Watch for insertions, updates, and replacements on the articles collection
+            with articles_collection.watch() as stream:
+                for change in stream:
+                    op_type = change.get("operationType")
+                    if op_type in ["insert", "update", "replace"]:
+                        print(f"[CHANGESTREAM] Detected article '{op_type}' event. Triggering auto-ingestion...")
+                        try:
+                            ingest()
+                            print("[CHANGESTREAM] Auto-ingestion complete.")
+                        except Exception as e:
+                            print(f"[CHANGESTREAM ERROR] Failed during auto-ingestion: {e}")
+        except Exception as e:
+            # Sleep 10s and retry (graceful fallback if MongoDB is not running as a replica set)
+            print(f"[CHANGESTREAM WARNING] Connection lost or not a replica set: {e}. Retrying in 10 seconds...")
+            time.sleep(10)
+
+
+@app.on_event("startup")
+def startup_event():
+    import threading
+    thread = threading.Thread(target=watch_mongodb_changes, daemon=True)
+    thread.start()
