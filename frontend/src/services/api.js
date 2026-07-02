@@ -27,10 +27,27 @@ const handleResponse = async (response) => {
 };
 
 export const api = {
-  // ========================================
-  // AUTH API
-  // ========================================
-  
+  // Admin login
+  adminLogin: async (password) => {
+    try {
+      const response = await fetch(`${API_URL}/auth/admin-login`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ password }),
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('❌ Admin login error:', error);
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+      };
+    }
+  },
+
   // Check if user exists (Email or Phone)
   checkUser: async (identifier) => {
     try {

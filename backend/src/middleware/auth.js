@@ -31,9 +31,13 @@ const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.userId = decoded.userId;
       
-      const user = await User.findById(decoded.userId).select('-password');
-      if (user) {
-        req.user = user;
+      if (decoded.role === 'admin') {
+        req.user = { _id: 'admin_user', role: 'admin', firstName: 'Admin', lastName: 'User' };
+      } else {
+        const user = await User.findById(decoded.userId).select('-password');
+        if (user) {
+          req.user = user;
+        }
       }
       
       next();
@@ -52,4 +56,15 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+const admin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin access only.',
+    });
+  }
+};
+
+module.exports = { protect, admin };

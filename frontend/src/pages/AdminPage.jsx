@@ -4,6 +4,14 @@ import { api } from '../services/api'
 
 const AdminPage = () => {
   const navigate = useNavigate()
+  
+  // Auth State
+  const [token, setToken] = useState(localStorage.getItem('admin_token') || null)
+  const [password, setPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
+
+  // Loading & Message State for publishing
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   
@@ -34,6 +42,40 @@ const AdminPage = () => {
     }))
   }
 
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setIsLoggingIn(true)
+    setLoginError('')
+
+    if (!password.trim()) {
+      setLoginError('Password is required')
+      setIsLoggingIn(false)
+      return
+    }
+
+    try {
+      const response = await api.adminLogin(password)
+      if (response.success) {
+        localStorage.setItem('admin_token', response.token)
+        setToken(response.token)
+        setPassword('')
+      } else {
+        setLoginError(response.message || 'Invalid admin credentials')
+      }
+    } catch (err) {
+      console.error('Login error:', err)
+      setLoginError('Network error. Failed to reach auth server.')
+    } finally {
+      setIsLoggingIn(false)
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('admin_token')
+    setToken(null)
+    setMessage({ type: '', text: '' })
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsLoading(true)
@@ -54,7 +96,7 @@ const AdminPage = () => {
     }
 
     try {
-      const response = await api.createArticle(formData)
+      const response = await api.createArticle(formData, token)
       if (response.success) {
         setMessage({
           type: 'success',
@@ -80,10 +122,16 @@ const AdminPage = () => {
         
         window.scrollTo({ top: 0, behavior: 'smooth' })
       } else {
-        setMessage({
-          type: 'error',
-          text: response.message || 'Failed to create article.'
-        })
+        // If forbidden or unauthorized, log them out
+        if (response.status === 401 || response.status === 403) {
+          handleLogout()
+          setLoginError('Session expired. Please log in again.')
+        } else {
+          setMessage({
+            type: 'error',
+            text: response.message || 'Failed to create article.'
+          })
+        }
       }
     } catch (error) {
       console.error('Submission error:', error)
@@ -96,17 +144,89 @@ const AdminPage = () => {
     }
   }
 
+  // --- RENDERING ADMIN LOGIN SCREEN ---
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8 bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl">
+          <div>
+            <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-2xl bg-yellow-500/10 text-yellow-500">
+              <span className="text-2xl">🔒</span>
+            </div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
+              Admin Login
+            </h2>
+            <p className="mt-2 text-center text-sm text-slate-400">
+              Access the DryvSquad AI admin publishing dashboard.
+            </p>
+          </div>
+
+          {loginError && (
+            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm flex items-center gap-2">
+              <span>⚠️</span>
+              <div>{loginError}</div>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="mt-8 space-y-6">
+            <div className="rounded-md shadow-sm space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Admin Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
+              />
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-slate-950 bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoggingIn ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-950 border-t-transparent" />
+                ) : (
+                  'Login'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // --- RENDERING ARTICLE CREATION FORM ---
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 py-24 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-900 text-slate-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-            DryvSquad Admin
-          </h1>
-          <p className="mt-2 text-sm text-slate-400">
-            Publish articles to the database.
-          </p>
+        <div className="flex items-center justify-between border-b border-slate-700/50 pb-6 mb-10">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-yellow-500/10 text-yellow-500 rounded-2xl text-xl">
+              ✨
+            </div>
+            <div>
+              <h1 className="text-2xl font-extrabold text-white">
+                DryvSquad AI Creator
+              </h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Publishing to database cluster & Pinecone vectors
+              </p>
+            </div>
+          </div>
+          
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition-colors"
+          >
+            Logout Admin
+          </button>
         </div>
 
         {/* Status Alerts */}
@@ -221,13 +341,11 @@ const AdminPage = () => {
                 />
                 {formData.image && (
                   <div className="mt-3 rounded-xl border border-slate-700/50 p-2 bg-slate-900/40 inline-block">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-semibold">
-                      Preview
-                    </p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-semibold">Preview</p>
                     <img 
                       src={formData.image} 
                       alt="Preview" 
-                      className="max-h-28 rounded-lg object-cover border-none"
+                      className="max-h-28 rounded-lg object-cover border border-slate-700"
                       onError={(e) => { e.target.style.display = 'none'; }}
                     />
                   </div>
@@ -298,6 +416,7 @@ const AdminPage = () => {
               className="w-full flex items-center justify-between px-6 py-4 bg-slate-900/40 text-left font-semibold text-white focus:outline-none hover:bg-slate-900/60 transition-colors"
             >
               <div className="flex items-center gap-2">
+                <span>🔍</span>
                 <span>SEO Metadata Configuration</span>
               </div>
               <span className={`transition-transform duration-200 ${showSeo ? 'rotate-180' : ''}`}>▼</span>
@@ -376,6 +495,7 @@ const AdminPage = () => {
                 </>
               ) : (
                 <>
+                  <span>🚀</span>
                   <span>Publish Article</span>
                 </>
               )}

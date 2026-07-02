@@ -654,3 +654,47 @@ exports.resendOTP = async (req, res) => {
     });
   }
 };
+
+// ========================================
+// POST /api/auth/admin-login - Admin authentication
+// ========================================
+exports.adminLogin = async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password is required',
+      });
+    }
+
+    const adminPassword = process.env.ADMIN_PASSWORD || 'DryvSquadAdmin2026';
+
+    if (password !== adminPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid admin password',
+      });
+    }
+
+    // Sign JWT token containing role: 'admin'
+    const token = jwt.sign(
+      { userId: 'admin_user', role: 'admin' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Admin authentication successful',
+      token,
+    });
+  } catch (error) {
+    console.error('❌ Admin login error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error. Please try again.',
+    });
+  }
+};
