@@ -17,7 +17,8 @@ const { sendSMSOTP } = require('../services/smsService'); // FIXED: Use sendSMSO
 const jwt = require('jsonwebtoken');
 
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, {
+  const jwtSecret = process.env.JWT_SECRET || 'vaahan_jwt_secret_fallback_key';
+  return jwt.sign({ userId }, jwtSecret, {
     expiresIn: process.env.JWT_EXPIRE || '7d',
   });
 };
@@ -679,9 +680,10 @@ exports.adminLogin = async (req, res) => {
     }
 
     // Sign JWT token containing role: 'admin'
+    const jwtSecret = process.env.JWT_SECRET || 'vaahan_jwt_secret_fallback_key';
     const token = jwt.sign(
       { userId: 'admin_user', role: 'admin' },
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: '1d' }
     );
 
