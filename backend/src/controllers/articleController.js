@@ -42,7 +42,12 @@ exports.getArticleBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
     
-    const article = await Article.findOne({ slug });
+    // Increment views and weeklyViews counters in MongoDB on retrieval
+    const article = await Article.findOneAndUpdate(
+      { slug },
+      { $inc: { views: 1, weeklyViews: 1 } },
+      { new: true }
+    );
     
     if (!article) {
       return res.status(404).json({
@@ -147,8 +152,9 @@ exports.getFeaturedArticles = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 3;
     
+    // Sort by lastWeekViews (descending) first, then total views, then newest
     const articles = await Article.find({ status: 'published' })
-      .sort({ createdAt: -1 })
+      .sort({ lastWeekViews: -1, views: -1, createdAt: -1 })
       .limit(limit);
     
     res.status(200).json({

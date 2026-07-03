@@ -16,6 +16,7 @@ import { motion } from 'framer-motion'
 import SearchBar from '../components/SearchBar'
 import { useTheme } from '../context/ThemeContext'
 import { getFeaturedTravelogues } from '../data/traveloguesData'
+import { getFeaturedArticles } from '../data/articlesData'
 
 // ========================================
 // STATIC DATA
@@ -104,28 +105,36 @@ const TESTIMONIALS = [
 const Home = () => {
   const { isDark } = useTheme()
   const [travelogues, setTravelogues] = useState([])
+  const [featuredArticles, setFeaturedArticles] = useState([])
   const [loading, setLoading] = useState(true)
 
   // ========================================
-  // Fetch travelogues on component mount
+  // Fetch travelogues & articles on component mount
   // ========================================
-  const fetchTravelogues = async () => {
+  const fetchHomeData = async () => {
     try {
-      console.log('🔄 Fetching travelogues from API...')
-      const logs = await getFeaturedTravelogues(4)
+      console.log('Fetching travelogues & articles from API...')
+      
+      const logsPromise = getFeaturedTravelogues(4)
+      const artsPromise = getFeaturedArticles(4)
+      
+      const [logs, arts] = await Promise.all([logsPromise, artsPromise])
+      
       console.log('✅ Received logs:', logs)
+      console.log('✅ Received featured articles:', arts)
+      
       setTravelogues(logs)
+      setFeaturedArticles(arts)
       setLoading(false)
-      console.log('✅ State updated - travelogues:', logs.length, 'items')
     } catch (error) {
-      console.error('❌ Error fetching featured travelogues:', error)
+      console.error('Error fetching homepage data:', error)
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    console.log('🔄 Home component mounted - fetching travelogues...')
-    fetchTravelogues()
+    console.log('Home component mounted - fetching dynamic data...')
+    fetchHomeData()
   }, [])
 
   // ========================================
@@ -520,39 +529,46 @@ const renderHero = () => {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {LATEST_ARTICLES.map((article, idx) => (
-              <motion.article
-                key={idx}
-                variants={scaleUp}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                transition={{ delay: idx * 0.08 }}
-                whileHover={{ y: -8 }}
-                className={`group rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-150 ${isDark ? 'bg-dark-800' : 'bg-white'}`}
-              >
-                <Link to={`/article/${article.slug}`}>
-                  <div className="relative h-52 overflow-hidden">
-                    <img src={article.image} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    <div className="absolute top-4 left-4">
-                      <span className="px-3 py-1 bg-yellow-500 text-gray-900 text-xs font-semibold rounded-full">{article.category}</span>
+            {featuredArticles && featuredArticles.length > 0 ? (
+              featuredArticles.map((article, idx) => (
+                <motion.article
+                  key={idx}
+                  variants={scaleUp}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.08 }}
+                  whileHover={{ y: -8 }}
+                  className={`group rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-150 ${isDark ? 'bg-dark-800' : 'bg-white'}`}
+                >
+                  <Link to={`/article/${article.slug}`}>
+                    <div className="relative h-52 overflow-hidden">
+                      <img src={article.image} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <div className="absolute top-4 left-4">
+                        <span className="px-3 py-1 bg-yellow-500 text-gray-900 text-xs font-semibold rounded-full">{article.category}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-5">
-                    <div className={`flex items-center gap-3 text-xs mb-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                      <span>{article.date}</span>
-                      <span>•</span>
-                      <span>{article.readTime}</span>
+                    <div className="p-5">
+                      <div className={`flex items-center gap-3 text-xs mb-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        <span>{article.date}</span>
+                        <span>•</span>
+                        <span>{article.readTime}</span>
+                      </div>
+                      <h3 className={`text-lg font-bold mb-2 line-clamp-2 group-hover:text-yellow-500 transition-colors ${isDark ? 'text-white' : 'text-gray-900'}`}>{article.title}</h3>
+                      <p className={`text-sm mb-4 line-clamp-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{article.excerpt}</p>
+                      <div className="inline-flex items-center text-yellow-500 font-semibold text-sm hover:text-yellow-600 transition-colors duration-150">
+                        Read Article →
+                      </div>
                     </div>
-                    <h3 className={`text-lg font-bold mb-2 line-clamp-2 group-hover:text-yellow-500 transition-colors ${isDark ? 'text-white' : 'text-gray-900'}`}>{article.title}</h3>
-                    <p className={`text-sm mb-4 line-clamp-3 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{article.excerpt}</p>
-                    <div className="inline-flex items-center text-yellow-500 font-semibold text-sm hover:text-yellow-600 transition-colors duration-150">
-                      Read Article →
-                    </div>
-                  </div>
-                </Link>
-              </motion.article>
-            ))}
+                  </Link>
+                </motion.article>
+              ))
+            ) : (
+              // Loading placeholders while fetching
+              [...Array(4)].map((_, idx) => (
+                <div key={idx} className={`animate-pulse rounded-xl h-96 ${isDark ? 'bg-slate-800' : 'bg-gray-200'}`} />
+              ))
+            )}
           </div>
         </div>
       </section>

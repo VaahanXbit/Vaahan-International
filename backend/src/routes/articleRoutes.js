@@ -34,6 +34,12 @@ router.get('/', getAllArticles);
 // Create a new article (protected with Admin role validation)
 router.post('/', protect, admin, createArticle);
 
+// Get featured articles (limit 3)
+router.get('/featured', getFeaturedArticles);
+
+// Get recent articles (limit 6)
+router.get('/recent', getRecentArticles);
+
 // Get article by slug
 router.get('/:slug', getArticleBySlug);
 
@@ -42,11 +48,5 @@ router.get('/category/:category', getArticlesByCategory);
 
 // Search articles
 router.get('/search/:query', searchArticles);
-
-// Get featured articles (limit 3)
-router.get('/featured', getFeaturedArticles);
-
-// Get recent articles (limit 6)
-router.get('/recent', getRecentArticles);
 
 module.exports = router;

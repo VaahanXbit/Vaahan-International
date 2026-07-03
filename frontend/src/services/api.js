@@ -448,6 +448,24 @@ export const api = {
     }
   },
 
+  // Get featured articles (popularity/views sorted)
+  getFeaturedArticles: async (limit = 4) => {
+    try {
+      const response = await fetch(`${API_URL}/articles/featured?limit=${limit}`, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error in getFeaturedArticles:', error);
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+      };
+    }
+  },
+
   // Create a new article
   createArticle: async (articleData, token = null) => {
     try {

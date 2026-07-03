@@ -118,6 +118,21 @@ export const techInsights = async () => {
   return await getArticlesByCategory('Tech Insights');
 };
 
+// Get featured articles (sorted by popularity/views on the backend)
+export const getFeaturedArticles = async (limit = 4) => {
+  try {
+    const result = await api.getFeaturedArticles(limit);
+    if (result.success) {
+      return result.articles;
+    }
+  } catch (error) {
+    console.error('Error in getFeaturedArticles data service:', error);
+  }
+  // Fallback: fetch all and slice
+  const all = await fetchArticles();
+  return all.slice(0, limit);
+};
+
 export default {
   getAllArticles,
   getArticleBySlug,
@@ -128,4 +143,5 @@ export default {
   featureReviews,
   newLaunches,
   techInsights,
+  getFeaturedArticles,
 };

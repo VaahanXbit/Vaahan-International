@@ -80,6 +80,18 @@ const TravelogueSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  views: {
+    type: Number,
+    default: 0,
+  },
+  weeklyViews: {
+    type: Number,
+    default: 0,
+  },
+  lastWeekViews: {
+    type: Number,
+    default: 0,
+  },
 });
 
 // Update updatedAt on save
