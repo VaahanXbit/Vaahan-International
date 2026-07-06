@@ -347,9 +347,6 @@ const CommonHeader = () => {
                 <div className={`font-semibold text-sm sm:text-base ${catTextColor}`}>
                   {category.name}
                 </div>
-                <div className={`text-[10px] sm:text-xs ${catSubTextColor}`}>
-                  {category.articles.length} articles
-                </div>
               </div>
               <span className="text-yellow-500 text-xs sm:text-sm">→</span>
             </Link>

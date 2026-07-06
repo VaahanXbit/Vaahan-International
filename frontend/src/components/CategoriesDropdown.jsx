@@ -130,9 +130,6 @@ const CategoriesDropdown = () => {
                 <div className={`font-semibold text-sm sm:text-base ${textColor}`}>
                   {category.name}
                 </div>
-                <div className={`text-[10px] sm:text-xs ${subTextColor}`}>
-                  {category.articles.length} articles
-                </div>
               </div>
               <span className="text-yellow-500 text-xs sm:text-sm">→</span>
             </Link>
