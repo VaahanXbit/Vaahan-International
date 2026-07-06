@@ -43,6 +43,11 @@ const TravelogueSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+
+  thumbnail: {
+    type: String,
+    default: '',
+  },
   author: {
     type: String,
     required: true,
@@ -95,7 +100,7 @@ const TravelogueSchema = new mongoose.Schema({
 });
 
 // Update updatedAt on save
-TravelogueSchema.pre('save', function(next) {
+TravelogueSchema.pre('save', function (next) {
   this.updatedAt = new Date();
   next();
 });
