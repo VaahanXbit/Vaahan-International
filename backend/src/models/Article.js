@@ -79,6 +79,18 @@ const ArticleSchema = new mongoose.Schema({
   publishedAt: {
     type: Date,
   },
+  views: {
+    type: Number,
+    default: 0,
+  },
+  weeklyViews: {
+    type: Number,
+    default: 0,
+  },
+  lastWeekViews: {
+    type: Number,
+    default: 0,
+  },
 });
 
 // Update updatedAt on save

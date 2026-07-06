@@ -543,6 +543,24 @@ export const api = {
     }
   },
 
+  // Get featured articles (popularity/views sorted)
+  getFeaturedArticles: async (limit = 4) => {
+    try {
+      const response = await fetch(`${API_URL}/articles/featured?limit=${limit}`, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error in getFeaturedArticles:', error);
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+      };
+    }
+  },
+
   // Create a new article
   createArticle: async (articleData, token = null) => {
     try {
@@ -561,6 +579,54 @@ export const api = {
       return await handleResponse(response);
     } catch (error) {
       console.error('❌ Create article error:', error);
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+      };
+    }
+  },
+
+  // Update an existing article
+  updateArticle: async (id, articleData, token = null) => {
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch(`${API_URL}/articles/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(articleData),
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('❌ Update article error:', error);
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+      };
+    }
+  },
+
+  // Delete an article
+  deleteArticle: async (id, token = null) => {
+    try {
+      const headers = {
+        'Accept': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch(`${API_URL}/articles/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('❌ Delete article error:', error);
       return {
         success: false,
         message: 'Network error. Please check your connection.',
