@@ -11,6 +11,7 @@ const compareRoutes = require('./routes/compareRoutes');
 const carRoutes = require('./routes/carRoutes');
 const travelogueRoutes = require('./routes/travelogueRoutes');
 const contactRoutes = require('./routes/contactRoutes');
+const leadRoutes = require('./routes/leadRoutes');
 
 
 const connectDB = require('./config/database');
@@ -78,6 +79,7 @@ app.use('/api/cars', carRoutes);
 app.use('/api/compare', compareRoutes);
 app.use('/api/travelogues', travelogueRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/leads', leadRoutes);
 
 
 
