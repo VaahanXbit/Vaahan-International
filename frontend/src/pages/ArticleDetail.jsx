@@ -10,10 +10,25 @@ Copyright : (c) 2025 Vaahan International. All rights reserved.
 ================================================================================
 */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
 import { getArticleBySlug, getAllArticles } from '../data/articlesData'
+import { api } from '../services/api'
+import AuthModal from '../components/AuthModal'
+
+// Pulls the userId out of a JWT without needing a network call — the token
+// payload is just base64, so this is safe to decode client-side (it's not
+// being trusted for anything security-sensitive, only for UI state like
+// "did I already upvote this?").
+const decodeUserId = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.userId || null
+  } catch {
+    return null
+  }
+}
 
 const ArticleDetail = () => {
   const { slug } = useParams()
@@ -21,6 +36,25 @@ const ArticleDetail = () => {
   const [article, setArticle] = useState(null)
   const [loading, setLoading] = useState(true)
   const [relatedArticles, setRelatedArticles] = useState([])
+
+  // Auth
+  const [token, setToken] = useState(() => localStorage.getItem('token'))
+  const currentUserId = useMemo(() => (token ? decodeUserId(token) : null), [token])
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+
+  // Upvotes
+  const [upvotes, setUpvotes] = useState(0)
+  const [hasUpvoted, setHasUpvoted] = useState(false)
+  const [upvoting, setUpvoting] = useState(false)
+
+  // Comments
+  const [comments, setComments] = useState([])
+  const [commentsLoading, setCommentsLoading] = useState(true)
+  const [commentText, setCommentText] = useState('')
+  const [postingComment, setPostingComment] = useState(false)
+  const [commentError, setCommentError] = useState('')
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editingText, setEditingText] = useState('')
 
   useEffect(() => {
     const fetchArticle = async () => {
@@ -38,6 +72,12 @@ const ArticleDetail = () => {
             .filter(a => a.category === articleData.category && a.slug !== slug)
             .slice(0, 3)
           setRelatedArticles(related)
+
+          // Seed upvote state from the article payload
+          setUpvotes(articleData.upvotes || 0)
+          setHasUpvoted(
+            !!currentUserId && (articleData.upvotedBy || []).includes(currentUserId)
+          )
         }
       } catch (error) {
         console.error('❌ Error fetching article:', error)
@@ -48,7 +88,127 @@ const ArticleDetail = () => {
     }
     
     fetchArticle()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
+
+  // Fetch comments once we know the article's real database id
+  useEffect(() => {
+    if (!article?._id) return
+
+    const fetchComments = async () => {
+      try {
+        setCommentsLoading(true)
+        const res = await api.getComments(article._id)
+        if (res.success) setComments(res.comments)
+      } catch (error) {
+        console.error('❌ Error fetching comments:', error)
+      } finally {
+        setCommentsLoading(false)
+      }
+    }
+
+    fetchComments()
+  }, [article?._id])
+
+  const requireAuth = () => {
+    if (!token) {
+      setIsAuthModalOpen(true)
+      return false
+    }
+    return true
+  }
+
+  const handleAuthModalClose = () => {
+    setIsAuthModalOpen(false)
+    // Pick up the token that AuthModal just saved to localStorage, if any
+    setToken(localStorage.getItem('token'))
+  }
+
+  const handleUpvote = async () => {
+    if (!requireAuth() || upvoting || !article?._id) return
+
+    setUpvoting(true)
+    const nextHasUpvoted = !hasUpvoted
+    // Optimistic update
+    setHasUpvoted(nextHasUpvoted)
+    setUpvotes((prev) => prev + (nextHasUpvoted ? 1 : -1))
+
+    try {
+      const res = await api.upvoteArticle(article._id, token)
+      if (res.success) {
+        setUpvotes(res.upvotes)
+        setHasUpvoted(res.hasUpvoted)
+      } else {
+        // Revert on failure
+        setHasUpvoted(!nextHasUpvoted)
+        setUpvotes((prev) => prev + (nextHasUpvoted ? -1 : 1))
+      }
+    } catch (error) {
+      console.error('❌ Error upvoting article:', error)
+      setHasUpvoted(!nextHasUpvoted)
+      setUpvotes((prev) => prev + (nextHasUpvoted ? -1 : 1))
+    } finally {
+      setUpvoting(false)
+    }
+  }
+
+  const handlePostComment = async (e) => {
+    e.preventDefault()
+    if (!requireAuth()) return
+    if (!commentText.trim() || !article?._id) return
+
+    setPostingComment(true)
+    setCommentError('')
+    try {
+      const res = await api.addComment(article._id, commentText.trim(), token)
+      if (res.success) {
+        setComments((prev) => [res.comment, ...prev])
+        setCommentText('')
+      } else {
+        setCommentError(res.message || 'Failed to post comment')
+      }
+    } catch (error) {
+      console.error('❌ Error posting comment:', error)
+      setCommentError('Network error. Please try again.')
+    } finally {
+      setPostingComment(false)
+    }
+  }
+
+  const startEditComment = (comment) => {
+    setEditingCommentId(comment._id)
+    setEditingText(comment.content)
+  }
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null)
+    setEditingText('')
+  }
+
+  const handleUpdateComment = async (commentId) => {
+    if (!editingText.trim()) return
+    try {
+      const res = await api.updateComment(commentId, editingText.trim(), token)
+      if (res.success) {
+        setComments((prev) => prev.map((c) => (c._id === commentId ? res.comment : c)))
+        cancelEditComment()
+      }
+    } catch (error) {
+      console.error('❌ Error updating comment:', error)
+    }
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    if (!token) return
+    try {
+      const res = await api.deleteComment(commentId, token)
+      if (res.success) {
+        setComments((prev) => prev.filter((c) => c._id !== commentId))
+      }
+    } catch (error) {
+      console.error('❌ Error deleting comment:', error)
+    }
+  }
 
   if (loading) {
     return (
@@ -149,9 +309,24 @@ const ArticleDetail = () => {
               </div>
             )}
 
-            {/* Share Section */}
-            <div className={`mt-6 sm:mt-8 pt-6 sm:pt-8 border-t transition-colors duration-300 ${isDark ? 'border-dark-700' : 'border-gray-200'}`}>
-              <h4 className={`font-semibold mb-3 ${isDark ? 'text-white' : 'text-gray-800'}`}>Share this article:</h4>
+            {/* Upvote & Share Section */}
+            <div className={`mt-6 sm:mt-8 pt-6 sm:pt-8 border-t transition-colors duration-300 flex flex-wrap items-center justify-between gap-3 ${isDark ? 'border-dark-700' : 'border-gray-200'}`}>
+              <button
+                onClick={handleUpvote}
+                disabled={upvoting}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors duration-300 disabled:opacity-60 ${
+                  hasUpvoted
+                    ? 'bg-yellow-500 text-gray-900'
+                    : isDark ? 'bg-dark-700 text-gray-300 hover:bg-dark-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <span>👍</span>
+                <span>{hasUpvoted ? 'Upvoted' : 'Upvote'}</span>
+                <span className={hasUpvoted ? 'text-gray-800' : isDark ? 'text-gray-400' : 'text-gray-500'}>
+                  ({upvotes})
+                </span>
+              </button>
+
               <div className="flex flex-wrap gap-2 sm:gap-3">
                 <button className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors duration-300 ${
                   isDark ? 'bg-dark-700 text-gray-300 hover:bg-dark-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -168,6 +343,126 @@ const ArticleDetail = () => {
           </div>
         </div>
       </section>
+
+      {/* Comments Section */}
+      <section className={`py-8 sm:py-12 md:py-16 transition-colors duration-300 ${isDark ? 'bg-dark-800' : 'bg-gray-50'}`}>
+        <div className="container-custom">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6">
+            <h2 className={`text-xl sm:text-2xl font-bold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              Comments ({comments.length})
+            </h2>
+
+            {/* New comment form */}
+            <form onSubmit={handlePostComment} className="mb-8">
+              <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onFocus={() => { if (!token) setIsAuthModalOpen(true) }}
+                placeholder={token ? 'Share your thoughts...' : 'Sign in to join the discussion...'}
+                rows={3}
+                maxLength={2000}
+                className={`w-full rounded-lg px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors duration-300 ${
+                  isDark ? 'bg-dark-900 text-white placeholder-gray-500 border border-dark-700' : 'bg-white text-gray-900 placeholder-gray-400 border border-gray-200'
+                }`}
+              />
+              {commentError && <p className="text-red-500 text-xs mt-2">{commentError}</p>}
+              <div className="flex justify-end mt-3">
+                <button
+                  type="submit"
+                  disabled={postingComment || !commentText.trim()}
+                  className="bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 font-semibold px-5 py-2 rounded-lg text-sm transition-colors duration-300"
+                >
+                  {postingComment ? 'Posting...' : 'Post Comment'}
+                </button>
+              </div>
+            </form>
+
+            {/* Comments list */}
+            {commentsLoading ? (
+              <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>Loading comments...</p>
+            ) : comments.length === 0 ? (
+              <p className={isDark ? 'text-gray-400' : 'text-gray-500'}>Be the first to comment on this article.</p>
+            ) : (
+              <div className="space-y-4">
+                {comments.map((comment) => {
+                  const commentUserId =
+                    comment.user && typeof comment.user === 'object' ? comment.user._id : comment.user
+                  const isOwn = !!currentUserId && commentUserId === currentUserId
+
+                  return (
+                    <div
+                      key={comment._id}
+                      className={`p-4 rounded-lg transition-colors duration-300 ${isDark ? 'bg-dark-900' : 'bg-white'}`}
+                    >
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                          {comment.authorName || 'Member'}
+                        </span>
+                        <span className={`text-xs whitespace-nowrap ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                          {new Date(comment.createdAt).toLocaleDateString()}
+                          {comment.isEdited ? ' (edited)' : ''}
+                        </span>
+                      </div>
+
+                      {editingCommentId === comment._id ? (
+                        <div className="mt-2">
+                          <textarea
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            rows={2}
+                            maxLength={2000}
+                            className={`w-full rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500 ${
+                              isDark ? 'bg-dark-700 text-white border border-dark-600' : 'bg-gray-50 text-gray-900 border border-gray-200'
+                            }`}
+                          />
+                          <div className="flex gap-3 mt-2">
+                            <button
+                              onClick={() => handleUpdateComment(comment._id)}
+                              className="text-xs font-semibold text-yellow-500 hover:text-yellow-600"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={cancelEditComment}
+                              className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className={`text-sm whitespace-pre-wrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {comment.content}
+                        </p>
+                      )}
+
+                      {isOwn && editingCommentId !== comment._id && (
+                        <div className="flex gap-3 mt-2">
+                          <button
+                            onClick={() => startEditComment(comment)}
+                            className={`text-xs font-semibold ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteComment(comment._id)}
+                            className="text-xs font-semibold text-red-500 hover:text-red-600"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Sign-in modal, opened whenever a guest tries to comment or upvote */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={handleAuthModalClose} />
 
       {/* Related Articles Section */}
       {relatedArticles.length > 0 && (
