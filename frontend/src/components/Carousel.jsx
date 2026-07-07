@@ -102,7 +102,7 @@ const Carousel = ({ children, ariaLabel = 'Carousel' }) => {
         ref={trackRef}
         role="region"
         aria-label={ariaLabel}
-        className="flex gap-4 md:gap-5 overflow-x-auto snap-x snap-mandatory hide-scrollbar scroll-smooth pb-2 -mx-4 px-4 sm:mx-0 sm:px-0"
+        className="flex gap-4 md:gap-5 overflow-x-auto snap-x snap-mandatory hide-scrollbar scroll-smooth pb-2"
         style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}
       >
         {children}
