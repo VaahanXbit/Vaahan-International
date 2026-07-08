@@ -12,13 +12,16 @@ Copyright : (c) 2026 Vaahan International. All rights reserved.
 const Comment = require('../models/Comment');
 const Article = require('../models/Article');
 
-// Build a friendly display name from whatever fields the user actually has.
+// Build a friendly display handle from whatever fields the user actually
+// has. Username is preferred (shown as "@handle"), matching how the rest of
+// the app (e.g. the profile page) identifies members — full names are only
+// a fallback for accounts that never set a username.
 const getDisplayName = (user) => {
   if (!user) return 'Member';
+  if (user.username) return `@${user.username}`;
+  if (user.email) return `@${user.email.split('@')[0]}`;
   const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
   if (fullName) return fullName;
-  if (user.username) return user.username;
-  if (user.email) return user.email.split('@')[0];
   return 'Member';
 };
 
@@ -54,7 +57,7 @@ exports.getCommentsForArticle = async (req, res) => {
 exports.addComment = async (req, res) => {
   try {
     const { articleId } = req.params;
-    const { content } = req.body;
+    const { content, parentComment } = req.body;
 
     if (req.user?._id === 'admin_user') {
       return res.status(400).json({
@@ -78,14 +81,32 @@ exports.addComment = async (req, res) => {
       });
     }
 
+    // If this is a reply, make sure the parent comment is real and belongs
+    // to the same article — replies are kept one level deep, so a reply to
+    // a reply still points at that reply's own parent (the top-level
+    // comment), flattening the thread like Instagram/YouTube do.
+    let parentId = null;
+    if (parentComment) {
+      const parent = await Comment.findById(parentComment);
+      if (!parent || parent.article.toString() !== articleId) {
+        return res.status(400).json({
+          success: false,
+          message: 'The comment you are replying to could not be found.',
+        });
+      }
+      parentId = parent.parentComment || parent._id;
+    }
+
     const comment = new Comment({
       article: articleId,
       user: req.user._id,
       authorName: getDisplayName(req.user),
       content: content.trim(),
+      parentComment: parentId,
     });
 
     await comment.save();
+    await comment.populate('user', 'firstName lastName username email profileImage');
 
     // Keep the denormalized count on the article in sync.
     await Article.findByIdAndUpdate(articleId, { $inc: { commentsCount: 1 } });

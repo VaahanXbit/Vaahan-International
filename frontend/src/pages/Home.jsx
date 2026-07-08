@@ -18,6 +18,7 @@ import Carousel from '../components/Carousel'
 import CarouselCard from '../components/CarouselCard'
 import { useTheme } from '../context/ThemeContext'
 import { getFeaturedTravelogues } from '../data/traveloguesData'
+import { getFeaturedArticles } from '../data/articlesData'
 
 // ========================================
 // STATIC DATA
@@ -106,21 +107,23 @@ const TESTIMONIALS = [
 const Home = () => {
   const { isDark } = useTheme()
   const [travelogues, setTravelogues] = useState([])
+  const [featuredArticles, setFeaturedArticles] = useState([])
   const [loading, setLoading] = useState(true)
 
   // ========================================
-  // Fetch travelogues on component mount
+  // Fetch travelogues & articles on component mount
   // ========================================
-  const fetchTravelogues = async () => {
+  const fetchHomeData = async () => {
     try {
       const [logs, arts] = await Promise.all([
         getFeaturedTravelogues(8),
         getFeaturedArticles(8)
       ])
       setTravelogues(logs)
+      setFeaturedArticles(arts)
       setLoading(false)
     } catch (error) {
-      console.error('❌ Error fetching featured travelogues:', error)
+      console.error('Error fetching homepage data:', error)
       setLoading(false)
     }
   }

@@ -22,6 +22,15 @@ const CommentSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  // If set, this comment is a reply to another comment on the same article.
+  // Kept one level deep (like Instagram/YouTube) — replies to replies just
+  // attach to the original top-level comment rather than nesting further.
+  parentComment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment',
+    default: null,
+    index: true,
+  },
   // Snapshot of the display name at time of posting, so comments still show
   // a sensible name even if the user later changes it.
   authorName: {

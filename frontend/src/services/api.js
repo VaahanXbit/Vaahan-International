@@ -561,6 +561,25 @@ export const api = {
     }
   },
 
+  // Get every article regardless of status (admin manage view — requires admin token)
+  getAllArticlesAdmin: async (token) => {
+    try {
+      const response = await fetch(`${API_URL}/articles/admin/all`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('❌ Get all articles (admin) error:', error);
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+      };
+    }
+  },
+
   // Create a new article
   createArticle: async (articleData, token = null) => {
     try {
@@ -710,8 +729,9 @@ export const api = {
     }
   },
 
-  // Add a comment to an article (requires logged-in member)
-  addComment: async (articleId, content, token) => {
+  // Add a comment to an article (requires logged-in member).
+  // Pass parentCommentId to post a reply instead of a top-level comment.
+  addComment: async (articleId, content, token, parentCommentId = null) => {
     try {
       const response = await fetch(`${API_URL}/articles/${articleId}/comments`, {
         method: 'POST',
@@ -720,7 +740,7 @@ export const api = {
           'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, parentComment: parentCommentId }),
       });
       return await handleResponse(response);
     } catch (error) {
