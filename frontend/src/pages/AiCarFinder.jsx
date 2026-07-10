@@ -1093,12 +1093,23 @@ const AiCarFinder = () => {
 
                 {/* Premium Banner at the bottom of results */}
                 <div className="flex flex-col md:flex-row items-center justify-between">
-                  <button
-                    onClick={() => setShowPremiumModal(true)}
-                    className="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold rounded-xl text-xs sm:text-sm transition-all hover:scale-[1.02] shrink-0"
-                  >
-                    Download Premium PDF (₹99)
-                  </button>
+                  {premiumUnlocked ? (
+                    <button
+                      onClick={() => setShowPremiumModal(true)}
+                      className="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold rounded-xl text-xs sm:text-sm transition-all hover:scale-[1.02] shrink-0 flex items-center gap-2 cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>Download Premium PDF Guide</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => navigate('/profile')}
+                      className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs sm:text-sm transition-all hover:scale-[1.02] shrink-0 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Lock className="w-4 h-4 text-yellow-500" />
+                      <span>Login to Download PDF Guide</span>
+                    </button>
+                  )}
                 </div>
 
               </motion.div>
@@ -1157,9 +1168,9 @@ const AiCarFinder = () => {
                     <span className="px-3 py-1 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-[10px] font-extrabold rounded-full uppercase tracking-wider">
                       Premium Report Checkout
                     </span>
-                    <h3 className="text-xl font-bold text-white">Unlock buying guide PDF (₹99)</h3>
+                    <h3 className="text-xl font-bold text-white">Download Premium Buying Guide PDF</h3>
                     <p className="text-xs text-slate-400">
-                      Fill out parameters to calculate personalized loan EMIs, resale depreciation, and maintenance predictions.
+                      Configure ownership parameters to calculate personalized loan EMIs, resale depreciation, and maintenance predictions.
                     </p>
                   </div>
 
@@ -1308,7 +1319,7 @@ const AiCarFinder = () => {
                     ) : (
                       <>
                         <FileText className="w-4 h-4" />
-                        <span>Download Premium PDF Guide (₹99)</span>
+                        <span>Download Premium PDF Guide</span>
                       </>
                     )}
                   </button>
@@ -1326,7 +1337,6 @@ const AiCarFinder = () => {
                     onClick={() => {
                       setShowPremiumModal(false)
                       setPdfSuccess(false)
-                      setPremiumUnlocked(true)
                     }}
                     className="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold rounded-xl text-sm transition-all shadow-lg"
                   >
