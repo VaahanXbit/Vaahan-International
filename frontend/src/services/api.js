@@ -10,7 +10,7 @@ Copyright : (c) 2026 Vaahan International. All rights reserved.
 ================================================================================
 */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').trim();
 
 // Helper function to handle response
 const handleResponse = async (response) => {
@@ -1053,7 +1053,7 @@ export const api = {
   // Fetch AI car comparison analysis
   getAiComparison: async (car1, car2, reportType, query = '') => {
     try {
-      const aiUrl = import.meta.env.VITE_AI_API_URL || 'http://127.0.0.1:8002';
+      const aiUrl = (import.meta.env.VITE_AI_API_URL || 'http://127.0.0.1:8002').trim();
       const response = await fetch(`${aiUrl}/api/ai-compare`, {
         method: 'POST',
         headers: {
@@ -1074,7 +1074,7 @@ export const api = {
   // ========================================
   getAiCarFinderRecommendations: async (budget, seating, usage, terrain, driver, customQuery = '') => {
     try {
-      const aiUrl = import.meta.env.VITE_AI_API_URL || 'http://127.0.0.1:8002';
+      const aiUrl = (import.meta.env.VITE_AI_API_URL || 'http://127.0.0.1:8002').trim();
       console.log('🌐 [VITE API] Attempting to fetch AI matches from:', `${aiUrl}/api/ai-car-finder`);
       const response = await fetch(`${aiUrl}/api/ai-car-finder`, {
         method: 'POST',
