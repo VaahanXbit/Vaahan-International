@@ -17,6 +17,8 @@ const Brand = require('../models/Brand');
 const Benchmark = require('../models/Benchmark');
 const RatingService = require('../services/ratingService');
 const mongoose = require('mongoose');
+const { calculateOnRoadPrice } = require('../services/pricing/calculator');
+const { resolveStateRule } = require('../services/pricing/stateRuleResolver');
 
 /**
  * Helper to check if string is valid MongoDB ObjectID
@@ -32,8 +34,11 @@ const isValidObjectId = (id) => {
  */
 const findVariantByAnyId = async (id) => {
   try {
+    console.log(`🔍 [compare debug] Looking up variant for id="${id}" (type: ${typeof id}, validObjectId: ${isValidObjectId(id)})`);
+
     if (isValidObjectId(id)) {
       const variant = await Variant.findById(id).lean();
+      console.log(`🔍 [compare debug] Variant.findById("${id}") ->`, variant ? `FOUND (${variant.name})` : 'NOT FOUND');
       if (variant) return variant;
     }
     
@@ -49,6 +54,8 @@ const findVariantByAnyId = async (id) => {
       const variants = await Variant.find({ 
         name: { $regex: new RegExp(`^${variantName}$`, 'i') } 
       }).lean();
+
+      console.log(`🔍 [compare debug] Fallback name search for "${variantName}" -> ${variants.length} candidate(s)`);
 
       if (variants.length === 0) return null;
 
@@ -115,7 +122,9 @@ const extractSpecNumeric = (value) => {
  */
 exports.compareCars = async (req, res) => {
   try {
-    const { car1Id, car2Id } = req.body;
+    const { car1Id, car2Id, city, state, stateCode } = req.body;
+    console.log(`🔍 [compare debug] Incoming compare request: car1Id="${car1Id}" car2Id="${car2Id}" city="${city}" state="${state}"`);
+    console.log(`🔍 [compare debug] Total variants in DB: ${await Variant.countDocuments()}`);
     
     if (!car1Id || !car2Id) {
       return res.status(400).json({
@@ -184,6 +193,35 @@ exports.compareCars = async (req, res) => {
     //   turningRadius: turningRadius2,
     // });
     
+    // ========================================
+    // Dynamic On-Road Price (location-aware)
+    // ========================================
+    // Only computed when the client supplied a location — Compare Cars
+    // sends this once a global location is selected. No onRoadPrice is
+    // ever read from the database; it's derived fresh from
+    // exShowroomPrice + the caller's state rules every time.
+    let onRoadPriceByCar = { car1: null, car2: null };
+    if (state || stateCode) {
+      const { rule, isFallback } = await resolveStateRule({ state, stateCode });
+      const buildOnRoad = (variant) => {
+        if (!variant.exShowroomPrice) return null;
+        return {
+          ...calculateOnRoadPrice({
+            exShowroomPrice: variant.exShowroomPrice,
+            fuelType: variant.fuelType,
+            city,
+            state: state || rule.state,
+            stateRule: rule,
+          }),
+          stateRuleUsed: isFallback ? 'national-average-fallback' : rule.state,
+        };
+      };
+      onRoadPriceByCar = {
+        car1: buildOnRoad(car1),
+        car2: buildOnRoad(car2),
+      };
+    }
+
     const car1Data = {
       _id: car1._id,
       name: car1.name,
@@ -192,6 +230,8 @@ exports.compareCars = async (req, res) => {
       brandIcon: brand1.icon,
       price: car1.price,
       exShowroomPrice: car1.exShowroomPrice,
+      fuelType: car1.fuelType,
+      onRoadPricing: onRoadPriceByCar.car1,
       image: model1.image,
       overallScore: car1.overallScore,
       torqueNumeric: car1.torqueNumeric || extractNumeric(car1.torque),
@@ -216,6 +256,8 @@ exports.compareCars = async (req, res) => {
       brandIcon: brand2.icon,
       price: car2.price,
       exShowroomPrice: car2.exShowroomPrice,
+      fuelType: car2.fuelType,
+      onRoadPricing: onRoadPriceByCar.car2,
       image: model2.image,
       overallScore: car2.overallScore,
       torqueNumeric: car2.torqueNumeric || extractNumeric(car2.torque),
@@ -233,6 +275,14 @@ exports.compareCars = async (req, res) => {
     
     // Calculate comparison
     const comparison = RatingService.compareCars(car1Data, car2Data, benchmarks);
+
+    // Defensive: RatingService may only copy a known whitelist of fields
+    // onto its own car1/car2 output objects. Re-attach onRoadPricing here
+    // so it reaches the client regardless of what RatingService does
+    // internally — the pricing engine's output must never depend on
+    // rating logic being aware of it.
+    if (comparison?.car1) comparison.car1.onRoadPricing = onRoadPriceByCar.car1;
+    if (comparison?.car2) comparison.car2.onRoadPricing = onRoadPriceByCar.car2;
     
     res.status(200).json({
       success: true,
