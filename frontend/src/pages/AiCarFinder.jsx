@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../context/ThemeContext'
+import { useLocation } from '../context/LocationContext'
 import { api } from '../services/api'
 import { jsPDF } from 'jspdf'
 import { 
@@ -47,13 +48,14 @@ const getBaseModelName = (name, brand) => {
 const AiCarFinder = () => {
   const { isDark } = useTheme()
   const navigate = useNavigate()
+  const { location } = useLocation()
 
   // --- WIZARD STATES ---
   const [currentStep, setCurrentStep] = useState(1)
   const [budgetSlider, setBudgetSlider] = useState(12)
   const [emiComfort, setEmiComfort] = useState('₹8K-₹12K')
   const [monthlyMaintSpend, setMonthlyMaintSpend] = useState('₹3K-₹6K')
-  const [city, setCity] = useState('Mumbai')
+  const city = location?.city || location?.district || location?.state || 'Delhi'
   const [lifeProfile, setLifeProfile] = useState('solo_commuter')
   const [dailyReality, setDailyReality] = useState(['Daily office commute (city)'])
   const [nonNegotiables, setNonNegotiables] = useState([])
@@ -99,7 +101,6 @@ const AiCarFinder = () => {
         if (state.budgetSlider) setBudgetSlider(state.budgetSlider)
         if (state.emiComfort) setEmiComfort(state.emiComfort)
         if (state.monthlyMaintSpend) setMonthlyMaintSpend(state.monthlyMaintSpend)
-        if (state.city) setCity(state.city)
         if (state.lifeProfile) setLifeProfile(state.lifeProfile)
         if (state.dailyReality) setDailyReality(state.dailyReality)
         if (state.nonNegotiables) setNonNegotiables(state.nonNegotiables)
@@ -195,7 +196,6 @@ const AiCarFinder = () => {
     setBudgetSlider(12)
     setEmiComfort('₹8K-₹12K')
     setMonthlyMaintSpend('₹3K-₹6K')
-    setCity('Mumbai')
     setLifeProfile('solo_commuter')
     setDailyReality(['Daily office commute (city)'])
     setNonNegotiables([])
@@ -598,7 +598,7 @@ const AiCarFinder = () => {
           <div className="mb-8">
             <div className="flex items-center justify-center gap-4 sm:gap-6 max-w-lg mx-auto mb-4">
               <div className="flex items-center">
-                {[1, 2, 3, 4, 5].map((s) => (
+                {[1, 2, 3, 4].map((s) => (
                   <div key={s} className="flex items-center">
                     <div 
                       onClick={() => {
@@ -614,7 +614,7 @@ const AiCarFinder = () => {
                     >
                       {s}
                     </div>
-                    {s < 5 && (
+                    {s < 4 && (
                       <div className={`h-[2px] w-6 sm:w-10 transition-colors ${
                         s < currentStep ? 'bg-yellow-500' : isDark ? 'bg-dark-800' : 'bg-slate-200'
                       }`} />
@@ -623,25 +623,13 @@ const AiCarFinder = () => {
                 ))}
               </div>
 
-              {/* Chevron back button immediately after step indicator tabs */}
-              <div className="w-8 h-8 flex items-center justify-center">
-                {currentStep > 1 && (
-                  <button
-                    onClick={() => setCurrentStep(prev => prev - 1)}
-                    className="p-1.5 rounded-xl bg-transparent hover:bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 hover:border-yellow-500/40 transition-all cursor-pointer flex items-center justify-center shadow-sm"
-                    title="Previous Step"
-                  >
-                    <ChevronLeft className="w-4.5 h-4.5" />
-                  </button>
-                )}
-              </div>
+              
             </div>
             <div className="text-center text-xs font-bold uppercase tracking-widest" style={{ color: isDark ? 'rgb(148, 163, 184)' : 'rgb(100, 116, 139)' }}>
               {currentStep === 1 && "Step 1: Money & Budget"}
-              {currentStep === 2 && "Step 2: Your City"}
-              {currentStep === 3 && "Step 3: Your Life Profile"}
-              {currentStep === 4 && "Step 4: Daily Reality & Non-negotiables"}
-              {currentStep === 5 && "Step 5: Ownership Plan"}
+              {currentStep === 2 && "Step 2: Your Life Profile"}
+              {currentStep === 3 && "Step 3: Daily Reality & Non-negotiables"}
+              {currentStep === 4 && "Step 4: Ownership Plan"}
             </div>
           </div>
 
@@ -724,37 +712,8 @@ const AiCarFinder = () => {
                 </div>
               )}
 
-              {/* STEP 2: YOUR CITY */}
+              {/* STEP 2: YOUR LIFE PROFILE */}
               {currentStep === 2 && (
-                <div className="space-y-6 max-w-md mx-auto">
-                  <div className="text-center">
-                    <h4 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Select your city</h4>
-                    <p className="text-xs text-slate-400">This helps filter models matching local infrastructure and charging station availability</p>
-                  </div>
-                  
-                  <div className="relative pt-4">
-                    <select
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-xs sm:text-sm font-semibold text-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-yellow-500 cursor-pointer font-sans"
-                    >
-                      {[
-                        "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Ahmedabad", "Chennai", 
-                        "Kolkata", "Pune", "Jaipur", "Lucknow", "Nagpur", "Indore", "Bhopal", 
-                        "Visakhapatnam", "Patna", "Vadodara", "Coimbatore", "Ludhiana", 
-                        "Agra", "Nashik", "Surat", "Kochi", "Dehradun", "Gurugram", "Noida",
-                        "Rural / Tier 3"
-                      ].map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: YOUR LIFE PROFILE */}
-              {currentStep === 3 && (
                 <div className="space-y-6">
                   <div className="text-center">
                     <h4 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Which profile describes you best?</h4>
@@ -848,8 +807,8 @@ const AiCarFinder = () => {
                 </div>
               )}
 
-              {/* STEP 4: DAILY REALITY & NON-NEGOTIABLES */}
-              {currentStep === 4 && (
+              {/* STEP 3: DAILY REALITY & NON-NEGOTIABLES */}
+              {currentStep === 3 && (
                 <div className="space-y-8">
                   {/* Daily Reality */}
                   <div className="space-y-4">
@@ -964,8 +923,8 @@ const AiCarFinder = () => {
                 </div>
               )}
 
-              {/* STEP 5: OWNERSHIP PLAN */}
-              {currentStep === 5 && (
+              {/* STEP 4: OWNERSHIP PLAN */}
+              {currentStep === 4 && (
                 <div className="space-y-6">
                   {/* Tenure */}
                   <div className="space-y-4">
@@ -1045,7 +1004,7 @@ const AiCarFinder = () => {
                 </div>
 
                 <div>
-                  {currentStep < 5 ? (
+                  {currentStep < 4 ? (
                     <button
                       onClick={() => setCurrentStep(prev => prev + 1)}
                       className="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1 hover:scale-[1.02] active:scale-[0.98] transition-all font-sans"

@@ -13,10 +13,10 @@ Copyright : (c) 2026 Vaahan International. All rights reserved.
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useTheme } from '../context/ThemeContext'
 import SearchBar from '../components/SearchBar'
 import Carousel from '../components/Carousel'
 import CarouselCard from '../components/CarouselCard'
-import { useTheme } from '../context/ThemeContext'
 import { getFeaturedTravelogues } from '../data/traveloguesData'
 import { getFeaturedArticles } from '../data/articlesData'
 import { SkeletonStyles, CarouselSkeleton, FadeIn } from '../components/skeletons/Skeletons'
@@ -101,32 +101,7 @@ const TESTIMONIALS = [
   { quote: "As a first-time car buyer, I was overwhelmed by all the technical jargon. Vaahan made it clear.", name: "Amit Sharma", role: "First Time Buyer" }
 ]
 
-// ========================================
-// HERO SEARCH CARD - Matches Wireframe Card
-// ========================================
 
-const HeroSearchCard = () => {
-  const navigate = useNavigate()
-  
-  return (
-    <div className="w-full bg-black/35 backdrop-blur-md p-6 sm:p-8 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10 text-left font-sans transition-all duration-300">
-      <h3 className="text-xl sm:text-2xl font-extrabold text-white mb-2 leading-tight">
-        Find your right car using AI
-      </h3>
-      <p className="text-xs sm:text-sm text-white/70 mb-6 leading-relaxed">
-        Answer a few simple questions about your budget, lifestyle, and driving needs to find your perfect match instantly.
-      </p>
-      
-      {/* Launch Search Button */}
-      <button
-        onClick={() => navigate('/ai-car-finder')}
-        className="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold rounded-xl text-xs sm:text-sm transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-yellow-500/10 flex items-center justify-center gap-2 cursor-pointer font-sans"
-      >
-        <span>Launch AI Car Finder</span>
-      </button>
-    </div>
-  )
-}
 
 // ========================================
 // HOME COMPONENT - Functional with Hooks
@@ -205,11 +180,6 @@ const Home = () => {
       `}</style>
         <div className="w-full relative aspect-[4/5] lg:aspect-[1672/941] ds-hero-box">
 
-          {/* Floating Search Card on Desktop (md screens and above) */}
-          <div className="absolute left-16 sm:left-20 lg:left-28 top-1/2 -translate-y-1/2 z-40 hidden md:block w-[340px] lg:w-[380px]">
-            <HeroSearchCard />
-          </div>
-
           {BANNERS.map((banner, index) => (
             <div
               key={banner.id}
@@ -269,6 +239,16 @@ const Home = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
             </svg>
           </button>
+
+          {/* Top Right "Launch AI Car Finder" CTA Button (positioned below sticky navbar) */}
+          <div className="absolute top-20 right-4 sm:top-22 sm:right-6 md:top-24 md:right-8 z-45">
+            <button
+              onClick={() => navigate('/ai-car-finder')}
+              className="px-4 py-2 sm:px-6 sm:py-3 bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold rounded-xl text-xs sm:text-sm transition-all duration-300 hover:scale-105 active:scale-95 shadow-[0_8px_30px_rgb(0,0,0,0.3)] border border-white/20 flex items-center gap-2 cursor-pointer font-sans"
+            >
+              <span>Launch Car Finder</span>
+            </button>
+          </div>
         </div>
 
         {/* Dots */}
@@ -293,10 +273,7 @@ const Home = () => {
           ))}
         </div>
 
-        {/* Render inline card below hero on mobile (under md screen) */}
-        <div className="md:hidden p-4 bg-slate-900 border-b border-slate-800">
-          <HeroSearchCard />
-        </div>
+
       </section>
     )
   }
