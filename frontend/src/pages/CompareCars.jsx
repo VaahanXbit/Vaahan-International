@@ -4,8 +4,8 @@
 File Name : CompareCars.jsx
 Author : Tahseen Raza
 Created Date : 2026-01-16
-Updated Date : 2026-06-27
-Description : Professional car comparison with CarDekho-style UX
+Updated Date : 2026-07-11
+Description : Professional car comparison with CarDekho-style UX and dynamic pricing
 Company : Vaahan International
 Copyright : (c) 2026 Vaahan International. All rights reserved.
 ================================================================================
@@ -14,6 +14,7 @@ Copyright : (c) 2026 Vaahan International. All rights reserved.
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../context/ThemeContext'
+import { useLocation } from '../context/LocationContext'
 import { api } from '../services/api'
 import ComparisonResults from '../components/compare/ComparisonResults'
 import { SkeletonStyles, CompareCardGridSkeleton, FadeIn } from '../components/skeletons/Skeletons'
@@ -513,9 +514,47 @@ const CarSelectionPopup = ({
 }
 
 // ========================================
-// Selected Car Display Card
+// Selected Car Display Card with On-Road Price
 // ========================================
 const SelectedCarCard = ({ car, onRemove, onEdit, isDark }) => {
+  const { location } = useLocation()
+  const [onRoadPrice, setOnRoadPrice] = useState(null)
+  const [pricingLoading, setPricingLoading] = useState(false)
+
+  useEffect(() => {
+    if (car?.id && location) {
+      fetchOnRoadPrice()
+    }
+  }, [car?.id, location])
+
+  const fetchOnRoadPrice = async () => {
+    setPricingLoading(true)
+    try {
+      const response = await api.calculateOnRoadPrice(
+        car.id,
+        location.city,
+        location.stateCode
+      )
+      if (response.success) {
+        setOnRoadPrice(response.data.pricing.total)
+      }
+    } catch (error) {
+      console.error('Error fetching on-road price:', error)
+    } finally {
+      setPricingLoading(false)
+    }
+  }
+
+  const formatPrice = (price) => {
+    if (!price) return 'N/A'
+    if (price >= 10000000) {
+      return `₹${(price / 10000000).toFixed(2)} Cr`
+    } else if (price >= 100000) {
+      return `₹${(price / 100000).toFixed(2)} Lakh`
+    }
+    return `₹${price.toFixed(0)}`
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -557,6 +596,37 @@ const SelectedCarCard = ({ car, onRemove, onEdit, isDark }) => {
           <span className="truncate">{car.variant}</span> 
           <button onClick={onEdit} className="text-[10px] underline text-gray-400 hover:text-gray-600 cursor-pointer">✎</button>
         </p>
+
+        {/* Ex-Showroom Price */}
+        <div className="mt-2">
+          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            Ex-Showroom: <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{car.price}</span>
+          </p>
+        </div>
+
+        {/* On-Road Price */}
+        <div className="mt-1">
+          <div className="flex items-center gap-2">
+            <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>On-Road:</span>
+            {pricingLoading ? (
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-gray-400">Loading...</span>
+              </div>
+            ) : onRoadPrice ? (
+              <span className={`text-sm font-bold ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                {formatPrice(onRoadPrice)}
+              </span>
+            ) : location ? (
+              <span className="text-xs text-gray-400">Calculating...</span>
+            ) : (
+              <span className="text-xs text-gray-400">Select location</span>
+            )}
+            {location && onRoadPrice && (
+              <span className="text-[9px] text-gray-400 ml-1">📍 {location.city}</span>
+            )}
+          </div>
+        </div>
 
         <div className="mt-auto pt-3">
           <p className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -645,16 +715,7 @@ const StickyComparisonHeader = ({ car1, car2, onEdit, onClose, isDark }) => {
     >
       <div className="container-custom">
         <div className="max-w-6xl mx-auto">
-          {/* Label row — desktop/tablet only, kept out of the flow on phones to save height */}
-          {/* <div className="hidden md:flex justify-center pt-2">
-            <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-dark-800 px-3 py-1.5 rounded-full border border-gray-200 dark:border-dark-600 shadow-sm">
-              Comparison View
-            </span>
-          </div> */}
-
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 py-2.5 sm:py-4 md:py-5 items-center">
-
-            {/* Parameter placeholder - desktop only, keeps car columns aligned with the rows below */}
             <div className="hidden md:block" aria-hidden="true"></div>
 
             {/* Car 1 */}
@@ -706,7 +767,6 @@ const StickyComparisonHeader = ({ car1, car2, onEdit, onClose, isDark }) => {
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </div>
@@ -786,6 +846,7 @@ const PopularComparisonCard = ({ comparison, onClick, isDark }) => {
 // ========================================
 const CompareCars = () => {
   const { isDark } = useTheme()
+  const { location, openLocationModal } = useLocation()
 
   const [carsData, setCarsData] = useState([])
   const [brandsData, setBrandsData] = useState([])
@@ -834,7 +895,7 @@ const CompareCars = () => {
               slug: model.slug,
               image: model.image,
               price: variant.price,
-              exShowroomPrice: variant.exShowroomPrice,
+              exShowroomPrice: variant.exShowroomPrice || parseFloat(variant.price?.replace(/[^0-9.]/g, '')) || 0,
               engine: variant.engine,
               torque: variant.torque,
               power: variant.power,
@@ -858,13 +919,6 @@ const CompareCars = () => {
     const fetchCarData = async () => {
       try {
         setDataError(null)
-
-        // getAllCarsInstant resolves immediately (no network wait) when
-        // data is already cached from the app-level prefetch or a prior
-        // visit — that's the normal case, and it's what makes this page
-        // open without a visible loading state. If the cache was stale,
-        // it still returns the cached copy right away and refreshes
-        // silently in the background via the onFresh callback below.
         const response = await api.getAllCarsInstant((fresh) => {
           if (!cancelled) applyResponse(fresh)
         })
@@ -881,7 +935,7 @@ const CompareCars = () => {
     return () => { cancelled = true }
   }, [])
 
-  // ✅ Dynamically Calculate the Highest Rated Variants for Popular Comparisons
+  // Dynamically Calculate the Highest Rated Variants for Popular Comparisons
   useEffect(() => {
     if (carsData.length === 0) return
 
@@ -941,7 +995,19 @@ const CompareCars = () => {
     try {
       const response = await api.compareCars(id1, id2)
       if (response.success) {
-        setComparisonData(response.data)
+        // Enhance car data with ex-showroom prices
+        const enhancedData = {
+          ...response.data,
+          car1: {
+            ...response.data.car1,
+            exShowroomPrice: car1?.exShowroomPrice || 0,
+          },
+          car2: {
+            ...response.data.car2,
+            exShowroomPrice: car2?.exShowroomPrice || 0,
+          }
+        }
+        setComparisonData(enhancedData)
         setShowComparison(true)
         setTimeout(() => {
           document.getElementById('comparison-results')?.scrollIntoView({ behavior: 'smooth' })
@@ -958,6 +1024,10 @@ const CompareCars = () => {
   }
 
   const handleCompare = () => {
+    if (!location) {
+      openLocationModal()
+      return
+    }
     executeComparison(car1Id, car2Id)
   }
 
@@ -1016,7 +1086,6 @@ const CompareCars = () => {
     setEditingCar(null)
     setShowEditPopup(false)
     setEditAnchorRef(null)
-    // window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handlePopularCompare = (comparison) => {
@@ -1029,8 +1098,6 @@ const CompareCars = () => {
     return (
       <div className={`min-h-screen ${isDark ? 'bg-dark-900' : 'bg-white'}`}>
         <SkeletonStyles />
-
-        {/* Hero renders immediately — it's static content, no need to wait */}
         <section className="relative pt-24 sm:pt-28 md:pt-32 pb-12 sm:pb-16 md:pb-20 bg-gradient-to-r from-gray-900 to-gray-800 text-white overflow-hidden">
           <div className="absolute inset-0 z-0">
             <img
@@ -1055,8 +1122,6 @@ const CompareCars = () => {
             </div>
           </div>
         </section>
-
-        {/* Selection card skeletons — same 2-up layout as the real selection cards */}
         <section className={`py-8 sm:py-10 md:py-12 transition-colors duration-300 ${isDark ? 'bg-dark-950' : 'bg-white'}`}>
           <div className="container-custom">
             <div className="max-w-4xl mx-auto">
@@ -1064,8 +1129,6 @@ const CompareCars = () => {
             </div>
           </div>
         </section>
-
-        {/* Popular comparisons skeleton */}
         <section className={`py-12 md:py-16 transition-colors duration-300 ${isDark ? 'bg-dark-900' : 'bg-gray-50'}`}>
           <div className="container-custom">
             <div className="max-w-6xl mx-auto">
@@ -1095,7 +1158,7 @@ const CompareCars = () => {
     <div className={`min-h-screen ${isDark ? 'bg-dark-900' : 'bg-white'}`}>
       <SkeletonStyles />
       
-      {/* RESTORED HERO SECTION */}
+      {/* HERO SECTION */}
       <section className="relative pt-24 sm:pt-28 md:pt-32 pb-12 sm:pb-16 md:pb-20 bg-gradient-to-r from-gray-900 to-gray-800 text-white overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img
@@ -1140,11 +1203,30 @@ const CompareCars = () => {
             >
               Select two cars to compare their features, scores, and specifications
             </motion.p>
+
+            {/* Location Status Banner */}
+            {!location && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-lg p-3 inline-flex items-center gap-2 text-yellow-300"
+              >
+                <span className="text-lg">📍</span>
+                <span className="text-sm">Please select your location for accurate on-road prices</span>
+                <button
+                  onClick={openLocationModal}
+                  className="ml-2 px-3 py-1 bg-yellow-500 text-gray-900 rounded-lg text-xs font-semibold hover:bg-yellow-400 transition-colors"
+                >
+                  Select Location
+                </button>
+              </motion.div>
+            )}
           </motion.div>
         </div>
       </section>
 
-      {/* Car Selection - Hidden when comparison results are shown */}
+      {/* Car Selection */}
       {!showComparison && (
         <section className={`py-8 sm:py-10 md:py-12 transition-colors duration-300 relative ${isDark ? 'bg-dark-950' : 'bg-white'}`}>
           <div className="container-custom">
@@ -1171,7 +1253,7 @@ const CompareCars = () => {
                   </AnimatePresence>
                 </div>
 
-                {/* Optional Subtle VS separator in the middle */}
+                {/* VS Separator */}
                 <div className="hidden md:flex absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 items-center justify-center w-10 h-10 rounded-full bg-white dark:bg-dark-800 border shadow-sm border-gray-200 dark:border-dark-600 text-[10px] font-bold text-gray-400">
                   VS
                 </div>
@@ -1208,7 +1290,7 @@ const CompareCars = () => {
                     : 'bg-gray-200 dark:bg-dark-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  Compare Now
+                  {!location ? '📍 Select Location First' : 'Compare Now'}
                 </motion.button>
                 {(car1 || car2) && (
                   <button onClick={resetAll} className={`block mx-auto mt-4 text-sm transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>
@@ -1265,7 +1347,6 @@ const CompareCars = () => {
               <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Popular Comparisons</h2>
             </div>
             
-            {/* Display the dynamically generated popular comparisons */}
             {popularCardsData.length === 0 ? (
               <CompareCardGridSkeleton count={5} isDark={isDark} />
             ) : (
