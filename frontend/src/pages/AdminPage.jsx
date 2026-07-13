@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 
@@ -21,6 +21,7 @@ const AdminPage = () => {
   const [contentType, setContentType] = useState('article') // 'article' or 'travelogue'
   const [manageType, setManageType] = useState('article') // 'article' or 'travelogue'
   const [editorBlocks, setEditorBlocks] = useState([])
+  const blockIdCounterRef = useRef(0)
 
   // Loading & Message State for publishing
   const [isLoading, setIsLoading] = useState(false)
@@ -48,6 +49,37 @@ const AdminPage = () => {
   })
 
   const [showSeo, setShowSeo] = useState(false)
+
+  const generateBlockId = () => {
+    blockIdCounterRef.current += 1
+    return `${Date.now()}-${blockIdCounterRef.current}-${Math.random().toString(36).slice(2, 8)}`
+  }
+
+  const htmlToEditableText = (htmlContent) => {
+    if (!htmlContent) return ''
+    const raw = String(htmlContent).trim()
+    if (!raw) return ''
+
+    // If it is already plain text, keep it as-is.
+    if (!/<\/?[a-z][\s\S]*>/i.test(raw)) return raw
+
+    if (typeof window === 'undefined') {
+      return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    }
+
+    const container = window.document.createElement('div')
+    container.innerHTML = raw
+
+    const paragraphs = Array.from(container.querySelectorAll('p'))
+      .map((p) => (p.textContent || '').trim())
+      .filter(Boolean)
+
+    if (paragraphs.length > 0) {
+      return paragraphs.join('\n\n')
+    }
+
+    return (container.textContent || '').replace(/\s+/g, ' ').trim()
+  }
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -99,28 +131,28 @@ const AdminPage = () => {
   const addSubheadingBlock = () => {
     setEditorBlocks(prev => [
       ...prev,
-      { id: Date.now(), type: 'subheading', text: '', color: 'orange' }
+      { id: generateBlockId(), type: 'subheading', text: '', color: 'orange' }
     ])
   }
 
   const addBodyBlock = () => {
     setEditorBlocks(prev => [
       ...prev,
-      { id: Date.now(), type: 'body', text: '' }
+      { id: generateBlockId(), type: 'body', text: '' }
     ])
   }
 
   const addCalloutBlock = () => {
     setEditorBlocks(prev => [
       ...prev,
-      { id: Date.now(), type: 'callout', title: '', color: 'yellow', style: 'points', text: '' }
+      { id: generateBlockId(), type: 'callout', title: '', color: 'yellow', style: 'points', text: '' }
     ])
   }
 
   const addAffiliateBlock = () => {
     setEditorBlocks(prev => [
       ...prev,
-      { id: Date.now(), type: 'affiliate', text: 'View Offer', url: '' }
+      { id: generateBlockId(), type: 'affiliate', text: 'View Offer', url: '' }
     ])
   }
 
@@ -398,14 +430,14 @@ const AdminPage = () => {
     
     // Load blocks from article or fallback to a single default body block
     if (item.blocks && Array.isArray(item.blocks)) {
-      const normalizedBlocks = item.blocks.map((block, idx) => ({
+      const normalizedBlocks = item.blocks.map((block) => ({
         ...block,
-        id: block.id || `${Date.now()}-${idx}-${Math.random()}`
+        id: generateBlockId()
       }))
       setEditorBlocks(normalizedBlocks)
     } else {
       setEditorBlocks([
-        { id: Date.now(), type: 'body', text: item.content || '' }
+        { id: generateBlockId(), type: 'body', text: htmlToEditableText(item.content || '') }
       ])
     }
 

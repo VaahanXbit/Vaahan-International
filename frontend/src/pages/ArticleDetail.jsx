@@ -41,6 +41,21 @@ import { Landmark, ShieldAlert } from 'lucide-react'
 const formatArticleContent = (content) => {
   if (!content) return ''
   const trimmed = content.trim()
+  if (!trimmed) return ''
+
+  // Recover older malformed records where HTML was saved as escaped entities.
+  if (typeof window !== 'undefined' && /&(amp;)?lt;\/?[a-z]/i.test(trimmed)) {
+    const parser = window.document.createElement('textarea')
+    let decoded = trimmed
+    for (let i = 0; i < 2; i += 1) {
+      parser.innerHTML = decoded
+      decoded = parser.value.trim()
+      if (/<\/?[a-z][\s\S]*>/i.test(decoded)) {
+        return decoded
+      }
+    }
+  }
+
   if (/<\/?[a-z][\s\S]*>/i.test(trimmed)) return trimmed
   return trimmed
     .split(/\n\s*\n/)

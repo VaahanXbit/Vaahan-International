@@ -16,6 +16,34 @@ import { useTheme } from '../context/ThemeContext';
 import { getTravelogueBySlug, getAllTravelogues } from '../data/traveloguesData';
 import { SkeletonStyles, TravelogueDetailSkeleton } from '../components/skeletons/Skeletons';
 
+const formatTravelogueContent = (content) => {
+  if (!content) return '';
+  const trimmed = String(content).trim();
+  if (!trimmed) return '';
+
+  // Recover older malformed records where HTML was saved as escaped entities.
+  if (typeof window !== 'undefined' && /&(amp;)?lt;\/?[a-z]/i.test(trimmed)) {
+    const parser = window.document.createElement('textarea');
+    let decoded = trimmed;
+    for (let i = 0; i < 2; i += 1) {
+      parser.innerHTML = decoded;
+      decoded = parser.value.trim();
+      if (/<\/?[a-z][\s\S]*>/i.test(decoded)) {
+        return decoded;
+      }
+    }
+  }
+
+  if (/<\/?[a-z][\s\S]*>/i.test(trimmed)) return trimmed;
+
+  return trimmed
+    .split(/\n\s*\n/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para) => `<p>${para.replace(/\n/g, '<br/>')}</p>`)
+    .join('');
+};
+
 const TravelogueDetail = () => {
   const { slug } = useParams();
   const { isDark } = useTheme();
@@ -132,7 +160,7 @@ const TravelogueDetail = () => {
 
             {/* Content */}
             <div className={`prose prose-sm sm:prose-base lg:prose-lg max-w-none ${isDark ? 'prose-invert' : ''}`}>
-              <div dangerouslySetInnerHTML={{ __html: travelogue.content }} />
+              <div dangerouslySetInnerHTML={{ __html: formatTravelogueContent(travelogue.content) }} />
             </div>
 
             {/* Tags */}
