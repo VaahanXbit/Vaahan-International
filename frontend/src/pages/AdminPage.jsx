@@ -201,7 +201,7 @@ const AdminPage = () => {
         }
         const borderColor = borderColors[block.color] || 'border-[#F97316]'
         const safeText = escapeHtml(block.text)
-        return `<h2 class="text-2xl font-bold border-l-4 ${borderColor} pl-4 py-1 text-white my-6 font-sans">${safeText}</h2>`
+        return `<h2 class="text-2xl font-bold border-l-4 ${borderColor} pl-4 py-1 my-6 font-sans">${safeText}</h2>`
       }
       
       if (block.type === 'body') {
@@ -210,7 +210,7 @@ const AdminPage = () => {
           .split('\n\n')
           .map(para => para.trim())
           .filter(para => para)
-          .map(para => `<p class="my-4 leading-relaxed text-slate-200">${para.replace(/\n/g, '<br />')}</p>`)
+          .map(para => `<p class="my-4 leading-relaxed">${para.replace(/\n/g, '<br />')}</p>`)
           .join('')
       }
 
