@@ -97,10 +97,19 @@ const buildRuleDoc = ({ state, stateCode, low, mid, high, luxury }) => ({
     minPremium: 8000,
   },
   fastag: {
+    amount: 500, // single configurable FASTag charge, per business spec
     issuanceFee: 100,
     minBalance: 200,
   },
   handlingCharges: 10000,
+  logisticsCharges: 3000,
+  tcs: {
+    thresholdPrice: 1000000, // ₹10 Lakh — current national TCS threshold
+    ratePercent: 1,
+  },
+  hypothecation: {
+    flatFee: 1500,
+  },
   greenTax: {
     applicable: false,
     flatFee: 0,

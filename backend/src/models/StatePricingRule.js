@@ -63,15 +63,43 @@ const StatePricingRuleSchema = new mongoose.Schema({
   },
 
   // ----- FASTag -----
+  // `amount` is the single configurable FASTag charge the business wants
+  // reflected in the on-road price (default ₹500, per spec). issuanceFee/
+  // minBalance are kept for backward compatibility with the original
+  // design and are used as a fallback only if `amount` isn't set.
   fastag: {
+    amount: { type: Number, default: 500 },
     issuanceFee: { type: Number, default: 100 },
     minBalance: { type: Number, default: 200 },
   },
 
   // ----- Handling / dealer logistics charges -----
+  // These are STATE-level defaults. A specific city can override either
+  // value via Location.handlingChargeOverride / logisticsChargeOverride —
+  // see services/pricing/handlingLogisticsService.js for the resolution
+  // order (city override > state default here).
   handlingCharges: {
     type: Number,
     default: 10000,
+  },
+  logisticsCharges: {
+    type: Number,
+    default: 3000,
+  },
+
+  // ----- TCS (Tax Collected at Source) -----
+  // Per Income Tax rules, TCS applies only when ex-showroom price exceeds
+  // a threshold (currently ₹10 Lakh nationally) — both the threshold and
+  // rate are configurable per state/rule so a future change in the law
+  // only requires a data update, not a code change.
+  tcs: {
+    thresholdPrice: { type: Number, default: 1000000 },
+    ratePercent: { type: Number, default: 1 },
+  },
+
+  // ----- Hypothecation (only charged when the customer finances via loan) -----
+  hypothecation: {
+    flatFee: { type: Number, default: 1500 },
   },
 
   // ----- Green Tax (typically applies to vehicles >15yrs or diesel in some

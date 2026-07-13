@@ -1409,7 +1409,7 @@ const CarSelectionPopup = ({
   carsData,
   brandsData,
   position,
-  otherCarId,
+  excludeCarIds,
 }) => {
   const [selectedBrand, setSelectedBrand] = useState('')
   const [selectedModel, setSelectedModel] = useState('')
@@ -1458,12 +1458,14 @@ const CarSelectionPopup = ({
     }
   }, [isOpen, step])
 
+  const excludeIds = excludeCarIds || []
+
   const getAvailableBrands = () => {
     if (!carsData) return []
     const allBrands = [...new Set(carsData.map(c => c.brand))]
-    if (!otherCarId) return allBrands
+    if (excludeIds.length === 0) return allBrands
     return allBrands.filter(brand => {
-      const availableCars = carsData.filter(c => c.brand === brand && c.id !== otherCarId)
+      const availableCars = carsData.filter(c => c.brand === brand && !excludeIds.includes(c.id))
       return availableCars.length > 0
     })
   }
@@ -1471,9 +1473,9 @@ const CarSelectionPopup = ({
   const getAvailableModelsForBrand = (brand) => {
     if (!carsData) return []
     const allModels = [...new Set(carsData.filter(c => c.brand === brand).map(c => c.model))]
-    if (!otherCarId) return allModels
+    if (excludeIds.length === 0) return allModels
     return allModels.filter(model => {
-      const availableCars = carsData.filter(c => c.brand === brand && c.model === model && c.id !== otherCarId)
+      const availableCars = carsData.filter(c => c.brand === brand && c.model === model && !excludeIds.includes(c.id))
       return availableCars.length > 0
     })
   }
@@ -1481,10 +1483,12 @@ const CarSelectionPopup = ({
   const getAvailableVariantsForBrandModel = (brand, model) => {
     if (!carsData) return []
     const allVariants = carsData.filter(c => c.brand === brand && c.model === model).map(c => c.variant)
-    if (!otherCarId) return allVariants
-    const otherCar = carsData.find(c => c.id === otherCarId)
-    if (otherCar && otherCar.brand === brand && otherCar.model === model) {
-      return allVariants.filter(v => v !== otherCar.variant)
+    if (excludeIds.length === 0) return allVariants
+    const excludedVariants = carsData
+      .filter(c => excludeIds.includes(c.id) && c.brand === brand && c.model === model)
+      .map(c => c.variant)
+    if (excludedVariants.length > 0) {
+      return allVariants.filter(v => !excludedVariants.includes(v))
     }
     return allVariants
   }
@@ -1593,7 +1597,7 @@ const CarSelectionPopup = ({
         <div className="space-y-0.5 max-h-52 overflow-y-auto custom-scrollbar pr-1">
           {filteredBrands.map((brand) => {
             const hasModels = getAvailableModelsForBrand(brand).length > 0
-            const brandAvailableCount = carsData.filter(c => c.brand === brand && c.id !== otherCarId).length
+            const brandAvailableCount = carsData.filter(c => c.brand === brand && !excludeIds.includes(c.id)).length
             return (
               <button
                 key={brand}
@@ -1970,7 +1974,7 @@ const SelectedCarCard = ({ car, onRemove, onEdit, isDark }) => {
 // ========================================
 // Add Car Button 
 // ========================================
-const AddCarButton = ({ onClick, isDark }) => {
+const AddCarButton = ({ onClick, isDark, label = 'Add car' }) => {
   return (
     <motion.button
       whileHover={{ scale: 1.01 }}
@@ -1985,7 +1989,7 @@ const AddCarButton = ({ onClick, isDark }) => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
         </svg>
       </div>
-      <span className="text-sm font-medium mb-6">Add car</span>
+      <span className="text-sm font-medium mb-6">{label}</span>
       
       {/* Mock Dropdowns */}
       <div className="w-3/4 max-w-[200px] space-y-2">
@@ -2009,8 +2013,9 @@ const AddCarButton = ({ onClick, isDark }) => {
 // ========================================
 // Sticky Comparison Header
 // ========================================
-const StickyComparisonHeader = ({ car1, car2, onEdit, onClose, isDark }) => {
+const StickyComparisonHeader = ({ car1, car2, car3, onEdit, onClose, isDark }) => {
   const [isVisible, setIsVisible] = useState(false)
+  const cars = [car1, car2, car3].filter(Boolean).map((car, idx) => ({ car, position: idx + 1 }))
 
   useEffect(() => {
     const handleScroll = () => {
@@ -2041,68 +2046,40 @@ const StickyComparisonHeader = ({ car1, car2, onEdit, onClose, isDark }) => {
     >
       <div className="container-custom">
         <div className="max-w-6xl mx-auto">
-          {/* Label row — desktop/tablet only, kept out of the flow on phones to save height */}
-          {/* <div className="hidden md:flex justify-center pt-2">
-            <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-dark-800 px-3 py-1.5 rounded-full border border-gray-200 dark:border-dark-600 shadow-sm">
-              Comparison View
-            </span>
-          </div> */}
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 py-2.5 sm:py-4 md:py-5 items-center">
-
-            {/* Parameter placeholder - desktop only, keeps car columns aligned with the rows below */}
-            <div className="hidden md:block" aria-hidden="true"></div>
-
-            {/* Car 1 */}
-            <div className="col-start-1 md:col-start-2 flex items-center justify-center relative md:border-r md:border-gray-200 dark:md:border-dark-700 min-w-0">
-              <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-                <div className="w-10 h-8 sm:w-16 sm:h-12 shrink-0 flex items-center justify-center bg-[#f4f5f7] dark:bg-dark-800 rounded p-1 border border-gray-100 dark:border-dark-600">
-                  <img 
-                    src={car1.image} 
-                    alt={car1.model} 
-                    className="max-w-full max-h-full object-contain mix-blend-multiply dark:mix-blend-normal" 
-                  />
-                </div>
-                <div className="text-left flex flex-col justify-center min-w-0">
-                  <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white leading-tight truncate">
-                    {car1.brand} {car1.model}
-                  </span>
-                  <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-medium mt-0.5 sm:mt-1 truncate">
-                    {car1.price} 
-                    <span className="mx-1 sm:mx-1.5 text-gray-300 dark:text-gray-600">|</span>
-                    <button onClick={() => onEdit(1)} className="hover:text-orange-500 text-gray-400 underline transition-colors">
-                      Edit
-                    </button>
-                  </span>
+          <div
+            className={`grid gap-3 sm:gap-6 py-2.5 sm:py-4 md:py-5 items-center`}
+            style={{ gridTemplateColumns: `repeat(${cars.length}, minmax(0, 1fr))` }}
+          >
+            {cars.map(({ car, position }, idx) => (
+              <div
+                key={position}
+                className={`flex items-center justify-center min-w-0 ${
+                  idx < cars.length - 1 ? 'md:border-r md:border-gray-200 dark:md:border-dark-700' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                  <div className="w-10 h-8 sm:w-16 sm:h-12 shrink-0 flex items-center justify-center bg-[#f4f5f7] dark:bg-dark-800 rounded p-1 border border-gray-100 dark:border-dark-600">
+                    <img 
+                      src={car.image} 
+                      alt={car.model} 
+                      className="max-w-full max-h-full object-contain mix-blend-multiply dark:mix-blend-normal" 
+                    />
+                  </div>
+                  <div className="text-left flex flex-col justify-center min-w-0">
+                    <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white leading-tight truncate">
+                      {car.brand} {car.model}
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-medium mt-0.5 sm:mt-1 truncate">
+                      {car.price} 
+                      <span className="mx-1 sm:mx-1.5 text-gray-300 dark:text-gray-600">|</span>
+                      <button onClick={() => onEdit(position)} className="hover:text-orange-500 text-gray-400 underline transition-colors">
+                        Edit
+                      </button>
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Car 2 */}
-            <div className="col-start-2 md:col-start-3 flex items-center justify-center min-w-0">
-              <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-                <div className="w-10 h-8 sm:w-16 sm:h-12 shrink-0 flex items-center justify-center bg-[#f4f5f7] dark:bg-dark-800 rounded p-1 border border-gray-100 dark:border-dark-600">
-                  <img 
-                    src={car2.image} 
-                    alt={car2.model} 
-                    className="max-w-full max-h-full object-contain mix-blend-multiply dark:mix-blend-normal" 
-                  />
-                </div>
-                <div className="text-left flex flex-col justify-center min-w-0">
-                  <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white leading-tight truncate">
-                    {car2.brand} {car2.model}
-                  </span>
-                  <span className="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 font-medium mt-0.5 sm:mt-1 truncate">
-                    {car2.price}
-                    <span className="mx-1 sm:mx-1.5 text-gray-300 dark:text-gray-600">|</span>
-                    <button onClick={() => onEdit(2)} className="hover:text-orange-500 text-gray-400 underline transition-colors">
-                      Edit
-                    </button>
-                  </span>
-                </div>
-              </div>
-            </div>
-
+            ))}
           </div>
         </div>
       </div>
@@ -2191,8 +2168,10 @@ const CompareCars = () => {
 
   const [car1Id, setCar1Id] = useState(null)
   const [car2Id, setCar2Id] = useState(null)
+  const [car3Id, setCar3Id] = useState(null) // optional 3rd car, CarDekho-style
   const [showPopup1, setShowPopup1] = useState(false)
   const [showPopup2, setShowPopup2] = useState(false)
+  const [showPopup3, setShowPopup3] = useState(false)
 
   const [comparisonData, setComparisonData] = useState(null)
   const [isComparing, setIsComparing] = useState(false)
@@ -2207,9 +2186,11 @@ const CompareCars = () => {
 
   const addCarRef1 = useRef(null)
   const addCarRef2 = useRef(null)
+  const addCarRef3 = useRef(null)
 
   const carCardRef1 = useRef(null)
   const carCardRef2 = useRef(null)
+  const carCardRef3 = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -2329,6 +2310,7 @@ const CompareCars = () => {
   const getCarById = (id) => carsData.find(c => c.id === id) || null
   const car1 = car1Id ? getCarById(car1Id) : null
   const car2 = car2Id ? getCarById(car2Id) : null
+  const car3 = car3Id ? getCarById(car3Id) : null
 
   // If the user changes their global location (via the navbar) while a
   // comparison is already on screen, refresh it so on-road price reflects
@@ -2340,18 +2322,18 @@ const CompareCars = () => {
       return
     }
     if (showComparison && car1Id && car2Id) {
-      executeComparison(car1Id, car2Id)
+      executeComparison(car1Id, car2Id, car3Id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location?.city, location?.state])
 
-  const executeComparison = async (id1, id2) => {
+  const executeComparison = async (id1, id2, id3 = null) => {
     if (!id1 || !id2) return
 
     setIsLoading(true)
     setIsComparing(true)
     try {
-      const response = await api.compareCars(id1, id2, location)
+      const response = await api.compareCars(id1, id2, location, id3)
       if (response.success) {
         setComparisonData(response.data)
         setShowComparison(true)
@@ -2370,12 +2352,13 @@ const CompareCars = () => {
   }
 
   const handleCompare = () => {
-    executeComparison(car1Id, car2Id)
+    executeComparison(car1Id, car2Id, car3Id)
   }
 
   const handleCarSelect = (position, car) => {
     let newCar1Id = car1Id
     let newCar2Id = car2Id
+    let newCar3Id = car3Id
 
     if (position === 1) {
       setCar1Id(car.id)
@@ -2383,14 +2366,18 @@ const CompareCars = () => {
     } else if (position === 2) {
       setCar2Id(car.id)
       newCar2Id = car.id
+    } else if (position === 3) {
+      setCar3Id(car.id)
+      newCar3Id = car.id
     }
     
     setShowPopup1(false)
     setShowPopup2(false)
+    setShowPopup3(false)
     setShowEditPopup(false)
     
     if (newCar1Id && newCar2Id && (showComparison || editingCar !== null)) {
-      executeComparison(newCar1Id, newCar2Id)
+      executeComparison(newCar1Id, newCar2Id, newCar3Id)
     }
     
     setEditingCar(null)
@@ -2400,8 +2387,10 @@ const CompareCars = () => {
   const openPopup = (position) => {
     if (position === 1) {
       setShowPopup1(true)
-    } else {
+    } else if (position === 2) {
       setShowPopup2(true)
+    } else {
+      setShowPopup3(true)
     }
   }
 
@@ -2409,8 +2398,10 @@ const CompareCars = () => {
     setEditingCar(position)
     if (position === 1) {
       setEditAnchorRef(carCardRef1)
-    } else {
+    } else if (position === 2) {
       setEditAnchorRef(carCardRef2)
+    } else {
+      setEditAnchorRef(carCardRef3)
     }
     setShowEditPopup(true)
   }
@@ -2422,6 +2413,7 @@ const CompareCars = () => {
   const resetAll = () => {
     setCar1Id(null)
     setCar2Id(null)
+    setCar3Id(null)
     setComparisonData(null)
     setIsComparing(false)
     setShowComparison(false)
@@ -2434,6 +2426,7 @@ const CompareCars = () => {
   const handlePopularCompare = (comparison) => {
     setCar1Id(comparison.car1.id)
     setCar2Id(comparison.car2.id)
+    setCar3Id(null)
     setTimeout(() => executeComparison(comparison.car1.id, comparison.car2.id), 300)
   }
 
@@ -2560,11 +2553,11 @@ const CompareCars = () => {
       {!showComparison && (
         <section className={`py-8 sm:py-10 md:py-12 transition-colors duration-300 relative ${isDark ? 'bg-dark-950' : 'bg-white'}`}>
           <div className="container-custom">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-5xl mx-auto">
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-stretch relative">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto_1fr] gap-4 md:gap-3 items-stretch">
                 
-                {/* Left Card */}
+                {/* Car 1 */}
                 <div ref={carCardRef1} className="w-full h-full">
                   <AnimatePresence mode="wait">
                     {car1 ? (
@@ -2583,12 +2576,12 @@ const CompareCars = () => {
                   </AnimatePresence>
                 </div>
 
-                {/* Optional Subtle VS separator in the middle */}
-                <div className="hidden md:flex absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 items-center justify-center w-10 h-10 rounded-full bg-white dark:bg-dark-800 border shadow-sm border-gray-200 dark:border-dark-600 text-[10px] font-bold text-gray-400">
+                {/* VS separator 1-2 */}
+                <div className="hidden md:flex items-center justify-center w-10 h-10 self-center rounded-full bg-white dark:bg-dark-800 border shadow-sm border-gray-200 dark:border-dark-600 text-[10px] font-bold text-gray-400">
                   VS
                 </div>
 
-                {/* Right Card */}
+                {/* Car 2 */}
                 <div ref={carCardRef2} className="w-full h-full">
                   <AnimatePresence mode="wait">
                     {car2 ? (
@@ -2602,6 +2595,30 @@ const CompareCars = () => {
                     ) : (
                       <div ref={addCarRef2} className="w-full h-full">
                         <AddCarButton key="add2" onClick={() => openPopup(2)} isDark={isDark} />
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Separator 2-3 — "VS" once a 3rd car is picked, "+" while it's still optional */}
+                <div className="hidden md:flex items-center justify-center w-10 h-10 self-center rounded-full bg-white dark:bg-dark-800 border shadow-sm border-gray-200 dark:border-dark-600 text-[10px] font-bold text-gray-400">
+                  {car3 ? 'VS' : '+'}
+                </div>
+
+                {/* Car 3 — optional, CarDekho-style */}
+                <div ref={carCardRef3} className="w-full h-full">
+                  <AnimatePresence mode="wait">
+                    {car3 ? (
+                      <SelectedCarCard 
+                        key="car3" 
+                        car={car3} 
+                        onRemove={() => setCar3Id(null)} 
+                        onEdit={() => handleEditCar(3)} 
+                        isDark={isDark} 
+                      />
+                    ) : (
+                      <div ref={addCarRef3} className="w-full h-full">
+                        <AddCarButton key="add3" onClick={() => openPopup(3)} isDark={isDark} label="Add car (optional)" />
                       </div>
                     )}
                   </AnimatePresence>
@@ -2620,9 +2637,9 @@ const CompareCars = () => {
                     : 'bg-gray-200 dark:bg-dark-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  Compare Now
+                  {car3 ? 'Compare Now (3 Cars)' : 'Compare Now'}
                 </motion.button>
-                {(car1 || car2) && (
+                {(car1 || car2 || car3) && (
                   <button onClick={resetAll} className={`block mx-auto mt-4 text-sm transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>
                     Reset Selection
                   </button>
@@ -2634,9 +2651,20 @@ const CompareCars = () => {
       )}
 
       {/* Popups */}
-      <CarSelectionPopup isOpen={showPopup1} onClose={() => setShowPopup1(false)} onSelect={(car) => handleCarSelect(1, car)} position={1} otherCarId={car2Id} isDark={isDark} anchorRef={addCarRef1} carsData={carsData} brandsData={brandsData} />
-      <CarSelectionPopup isOpen={showPopup2} onClose={() => setShowPopup2(false)} onSelect={(car) => handleCarSelect(2, car)} position={2} otherCarId={car1Id} isDark={isDark} anchorRef={addCarRef2} carsData={carsData} brandsData={brandsData} />
-      <CarSelectionPopup isOpen={showEditPopup} onClose={() => { setShowEditPopup(false); setEditingCar(null); setEditAnchorRef(null); }} onSelect={(car) => handleCarSelect(editingCar, car)} position={editingCar} otherCarId={editingCar === 1 ? car2Id : car1Id} isDark={isDark} anchorRef={editAnchorRef} carsData={carsData} brandsData={brandsData} />
+      <CarSelectionPopup isOpen={showPopup1} onClose={() => setShowPopup1(false)} onSelect={(car) => handleCarSelect(1, car)} position={1} excludeCarIds={[car2Id, car3Id].filter(Boolean)} isDark={isDark} anchorRef={addCarRef1} carsData={carsData} brandsData={brandsData} />
+      <CarSelectionPopup isOpen={showPopup2} onClose={() => setShowPopup2(false)} onSelect={(car) => handleCarSelect(2, car)} position={2} excludeCarIds={[car1Id, car3Id].filter(Boolean)} isDark={isDark} anchorRef={addCarRef2} carsData={carsData} brandsData={brandsData} />
+      <CarSelectionPopup isOpen={showPopup3} onClose={() => setShowPopup3(false)} onSelect={(car) => handleCarSelect(3, car)} position={3} excludeCarIds={[car1Id, car2Id].filter(Boolean)} isDark={isDark} anchorRef={addCarRef3} carsData={carsData} brandsData={brandsData} />
+      <CarSelectionPopup
+        isOpen={showEditPopup}
+        onClose={() => { setShowEditPopup(false); setEditingCar(null); setEditAnchorRef(null); }}
+        onSelect={(car) => handleCarSelect(editingCar, car)}
+        position={editingCar}
+        excludeCarIds={[car1Id, car2Id, car3Id].filter((id) => id && id !== (editingCar === 1 ? car1Id : editingCar === 2 ? car2Id : car3Id))}
+        isDark={isDark}
+        anchorRef={editAnchorRef}
+        carsData={carsData}
+        brandsData={brandsData}
+      />
 
       {/* Loading Modal */}
       <AnimatePresence>
@@ -2656,14 +2684,14 @@ const CompareCars = () => {
       </AnimatePresence>
 
       {showComparison && car1 && car2 && (
-        <StickyComparisonHeader car1={car1} car2={car2} onEdit={handleEditCar} onClose={closeComparison} isDark={isDark} />
+        <StickyComparisonHeader car1={car1} car2={car2} car3={car3} onEdit={handleEditCar} onClose={closeComparison} isDark={isDark} />
       )}
 
       {showComparison && comparisonData && (
         <section id="comparison-results" className={`py-12 ${isDark ? 'bg-dark-950' : 'bg-gray-50'}`}>
           <div className="container-custom">
             <div className="max-w-6xl mx-auto">
-              <ComparisonResults comparisonData={comparisonData} car1={car1} car2={car2} onClear={closeComparison} onEdit={handleEditCar} carCardRef1={carCardRef1} carCardRef2={carCardRef2} />
+              <ComparisonResults comparisonData={comparisonData} car1={car1} car2={car2} car3={car3} onClear={closeComparison} onEdit={handleEditCar} carCardRef1={carCardRef1} carCardRef2={carCardRef2} carCardRef3={carCardRef3} />
             </div>
           </div>
         </section>

@@ -1695,11 +1695,11 @@ export const api = {
   // COMPARISON API (NEW - Industry Benchmark Based)
   // ========================================
 
-  // Compare two cars with industry benchmark ratings.
+  // Compare two (or optionally three) cars with industry benchmark ratings.
   // `location` is optional — { city, state, stateCode } — when provided,
   // the backend attaches a location-aware onRoadPricing breakdown to each
-  // car in the response.
-  compareCars: async (car1Id, car2Id, location = null) => {
+  // car in the response. `car3Id` is optional — CarDekho-style 3-way compare.
+  compareCars: async (car1Id, car2Id, location = null, car3Id = null) => {
     try {
       const response = await fetch(`${API_URL}/compare/compare`, {
         method: 'POST',
@@ -1710,6 +1710,7 @@ export const api = {
         body: JSON.stringify({
           car1Id,
           car2Id,
+          car3Id: car3Id || undefined,
           city: location?.city,
           state: location?.state,
           stateCode: location?.stateCode,

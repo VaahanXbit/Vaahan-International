@@ -73,6 +73,21 @@ const LocationSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+
+  // ----- Optional city-level dealer charge overrides -----
+  // Dealer handling/logistics charges commonly vary by city even within
+  // the same state (e.g. metro vs tier-2). When set, these override the
+  // state-level defaults in StatePricingRule for this specific city — see
+  // services/pricing/handlingLogisticsService.js for the resolution
+  // order. Left null/unset, the state default applies.
+  handlingChargeOverride: {
+    type: Number,
+    default: null,
+  },
+  logisticsChargeOverride: {
+    type: Number,
+    default: null,
+  },
 }, { timestamps: true });
 
 LocationSchema.index({ searchText: 'text' });
