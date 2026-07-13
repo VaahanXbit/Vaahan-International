@@ -212,6 +212,7 @@ exports.createArticle = async (req, res) => {
       excerpt,
       content,
       image,
+      thumbnail,
       author,
       date,
       readTime,
@@ -232,16 +233,29 @@ exports.createArticle = async (req, res) => {
       });
     }
 
-    // Auto-generate slug from title
-    const slug = title
-      .toString()
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, '-')
-      .replace(/[^\w\-]+/g, '')
-      .replace(/\-\-+/g, '-')
-      .replace(/^-+/, '')
-      .replace(/-+$/, '');
+    // Use manual slug if provided, else auto-generate from title
+    let slug = req.body.slug;
+    if (slug && slug.trim()) {
+      slug = slug
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
+    } else {
+      slug = title
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
+    }
 
     // Check if slug already exists to prevent duplicate key error
     const existingArticle = await Article.findOne({ slug });
@@ -269,6 +283,7 @@ exports.createArticle = async (req, res) => {
       excerpt,
       content,
       image,
+      thumbnail: thumbnail || '',
       author,
       date,
       readTime,
@@ -312,6 +327,7 @@ exports.updateArticle = async (req, res) => {
       excerpt,
       content,
       image,
+      thumbnail,
       author,
       date,
       readTime,
@@ -332,9 +348,19 @@ exports.updateArticle = async (req, res) => {
       });
     }
 
-    // Generate slug from title if modified
+    // Use manual slug if provided, else generate slug from title if modified
     let slug = article.slug;
-    if (title && title !== article.title) {
+    if (req.body.slug !== undefined && req.body.slug.trim()) {
+      slug = req.body.slug
+        .toString()
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
+    } else if (title && title !== article.title) {
       slug = title
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
@@ -358,6 +384,7 @@ exports.updateArticle = async (req, res) => {
       excerpt,
       content,
       image,
+      thumbnail: thumbnail !== undefined ? thumbnail : article.thumbnail,
       author,
       date,
       readTime,

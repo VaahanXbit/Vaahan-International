@@ -28,6 +28,7 @@ const AdminPage = () => {
   // Form State
   const [formData, setFormData] = useState({
     title: '',
+    slug: '',
     category: 'Tech Insights',
     subCategory: '',
     excerpt: '',
@@ -69,6 +70,25 @@ const AdminPage = () => {
       setFormData((prev) => ({
         ...prev,
         image: reader.result,
+      }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleThumbnailUpload = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('File size exceeds the 2MB limit. Please upload a smaller image.')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setFormData((prev) => ({
+        ...prev,
+        thumbnail: reader.result,
       }))
     }
     reader.readAsDataURL(file)
@@ -170,6 +190,7 @@ const AdminPage = () => {
     setContentType(type)
     setFormData({
       title: item.title || '',
+      slug: item.slug || '',
       category: item.category || (type === 'article' ? 'Tech Insights' : 'Travel Stories'),
       subCategory: item.subCategory || '',
       excerpt: item.excerpt || '',
@@ -197,6 +218,7 @@ const AdminPage = () => {
     setEditingId(null)
     setFormData({
       title: '',
+      slug: '',
       category: contentType === 'article' ? 'Tech Insights' : 'Travel Stories',
       subCategory: '',
       excerpt: '',
@@ -543,6 +565,9 @@ const AdminPage = () => {
                         <td className="py-4 px-4">{art.date}</td>
                         <td className="py-4 px-4">{art.author}</td>
                         <td className="py-4 px-4 text-right space-x-2 whitespace-nowrap">
+                          <span className="inline-block px-2.5 py-1 bg-slate-800 text-slate-450 rounded-lg text-[10px] font-bold uppercase tracking-wider mr-2">
+                            {art.category}
+                          </span>
                           <button
                             onClick={() => handleEditClick(art, manageType)}
                             className="px-3 py-1.5 bg-yellow-500/10 hover:bg-yellow-500 text-yellow-500 hover:text-slate-950 rounded-lg text-xs font-semibold transition-all"
@@ -615,6 +640,21 @@ const AdminPage = () => {
                   />
                 </div>
 
+                {/* Slug */}
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    Slug / URL Path (Optional - Auto-generates if empty)
+                  </label>
+                  <input
+                    type="text"
+                    name="slug"
+                    value={formData.slug || ''}
+                    onChange={handleInputChange}
+                    placeholder="e.g. how-abs-prevents-wheel-lock"
+                    className="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
+                  />
+                </div>
+
                 {/* Category */}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
@@ -630,8 +670,8 @@ const AdminPage = () => {
                   />
                 </div>
 
-                {/* Sub-Category vs Thumbnail */}
-                {contentType === 'article' ? (
+                {/* Sub-Category (Article only) */}
+                {contentType === 'article' && (
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
                       Sub-Category (Optional)
@@ -645,21 +685,57 @@ const AdminPage = () => {
                       className="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
                     />
                   </div>
-                ) : (
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                      Thumbnail Image URL (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      name="thumbnail"
-                      value={formData.thumbnail || ''}
-                      onChange={handleInputChange}
-                      placeholder="e.g. /images/travelogue/thumbnails/bike-vs-car.png"
-                      className="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
-                    />
-                  </div>
                 )}
+
+                {/* Thumbnail URL & Upload (Both) */}
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    Thumbnail Image Path / URL (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    name="thumbnail"
+                    value={(formData.thumbnail || '').startsWith('data:') ? 'Device Thumbnail Selected (Base64)' : formData.thumbnail || ''}
+                    onChange={handleInputChange}
+                    disabled={(formData.thumbnail || '').startsWith('data:')}
+                    placeholder={(formData.thumbnail || '').startsWith('data:') ? 'Clear uploaded thumbnail to use URL' : "e.g. /images/travelogue/thumbnails/bike-vs-car.png"}
+                    className="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all disabled:opacity-50"
+                  />
+                  
+                  <div className="mt-3 flex items-center gap-3">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">OR</span>
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition-all border border-slate-700">
+                      <span>Upload from Device</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleThumbnailUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {(formData.thumbnail || '').startsWith('data:') && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, thumbnail: '' }))}
+                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold rounded-lg transition-all border border-rose-500/20"
+                      >
+                        Clear Upload
+                      </button>
+                    )}
+                  </div>
+
+                  {formData.thumbnail && (
+                    <div className="mt-3 rounded-xl border border-slate-700/50 p-2 bg-slate-900/40 inline-block">
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-semibold">Preview</p>
+                      <img 
+                        src={formData.thumbnail} 
+                        alt="Thumbnail Preview" 
+                        className="max-h-20 rounded-lg object-cover border border-slate-700"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    </div>
+                  )}
+                </div>
 
                 {/* Author */}
                 <div>
@@ -933,14 +1009,14 @@ const AdminPage = () => {
           </form>
 
           {/* --- RIGHT COLUMN: LIVE STICKY PREVIEW --- */}
-          <div className="lg:sticky lg:top-28 space-y-6 bg-slate-800/20 border border-slate-700/50 rounded-2xl overflow-hidden shadow-2xl max-h-[85vh] flex flex-col">
+          <div className="lg:sticky lg:top-28 space-y-6 bg-slate-800/20 border border-slate-700/50 rounded-2xl overflow-hidden shadow-2xl">
             {/* Header */}
             <div className="bg-slate-900/65 border-b border-slate-700/50 px-6 py-3 flex items-center gap-2 text-slate-400 text-xs">
               <span>Live Article Preview</span>
             </div>
 
-            {/* Scrollable Preview Area */}
-            <div className="flex-1 overflow-y-auto bg-slate-950 text-white pb-8">
+            {/* Full Height Preview Area */}
+            <div className="bg-slate-950 text-white pb-8">
               {/* Cover Banner (Hero) */}
               <div className="relative overflow-hidden pt-10 pb-8 bg-gradient-to-r from-blue-950 via-slate-900 to-slate-800 border-b border-slate-800">
                 <div className="px-6 max-w-2xl mx-auto">

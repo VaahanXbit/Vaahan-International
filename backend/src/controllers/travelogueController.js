@@ -146,11 +146,19 @@ exports.createTravelogue = async (req, res) => {
       seoDescription
     } = req.body;
 
-    // Generate unique slug from title
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+    // Use manual slug if provided, else generate unique slug from title
+    let slug = req.body.slug;
+    if (slug && slug.trim()) {
+      slug = slug
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    } else {
+      slug = title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    }
 
     // Process tags array
     const processedTags = Array.isArray(tags) 
@@ -221,9 +229,14 @@ exports.updateTravelogue = async (req, res) => {
       });
     }
 
-    // Generate slug from title if modified
+    // Use manual slug if provided, else generate slug from title if modified
     let slug = travelogue.slug;
-    if (title && title !== travelogue.title) {
+    if (req.body.slug !== undefined && req.body.slug.trim()) {
+      slug = req.body.slug
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    } else if (title && title !== travelogue.title) {
       slug = title
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')

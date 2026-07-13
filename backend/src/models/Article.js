@@ -34,6 +34,10 @@ const ArticleSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  thumbnail: {
+    type: String,
+    trim: true,
+  },
   author: {
     type: String,
     required: true,
