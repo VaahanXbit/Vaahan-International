@@ -139,45 +139,53 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 const allowedOrigins = [
+  // Local Development
   "http://localhost:3000",
   "http://localhost:5173",
   "http://localhost:5000",
 
-  // Production
+  // Production Domain
   "https://www.dryvsquad.com",
   "https://dryvsquad.com",
 
-  // Optional: Your backend frontend URLs
-  "https://vaahan-international-obbc.vercel.app",
-  "https://vaahan-international-jnrgeygvv-tahseen-razas-projects.vercel.app",
+  // Current Production Frontend
+  "https://vaahan-international-brl9.vercel.app",
 
-  // Environment variable
+  // Environment Variable
   process.env.FRONTEND_URL,
-];
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests without Origin (Postman, curl, server-to-server)
     if (!origin) return callback(null, true);
-    
-    const isAllowed = allowedOrigins.indexOf(origin) !== -1 || 
-                      (origin.endsWith('.vercel.app') && (
-                        origin.includes('vaahan') || 
-                        origin.includes('dryvsquad') || 
-                        origin.includes('demo-frontend-wine')
-                      )) ||
-                      /^https?:\/\/localhost:\d+$/.test(origin);
+
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+
+      // Allow all future Vercel preview deployments
+      (origin.endsWith(".vercel.app") &&
+        origin.includes("vaahan-international")) ||
+
+      // Allow localhost on any port
+      /^https?:\/\/localhost:\d+$/.test(origin);
 
     if (isAllowed) {
       callback(null, true);
     } else {
-      console.log('❌ CORS blocked for origin:', origin);
-      callback(new Error('Not allowed by CORS'));
+      console.log("❌ CORS blocked for origin:", origin);
+      callback(new Error("Not allowed by CORS"));
     }
   },
+
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+  ],
 }));
 
 // Body parser
