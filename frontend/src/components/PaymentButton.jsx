@@ -62,7 +62,7 @@ export default function PaymentButton({
       setLoaderMessage('Waiting for payment…');
       const checkoutResult = await openCheckout({
         order,
-        name: 'Vaahan International',
+        name: 'DryvSquad',
         description: resourceName || resourceType,
         prefill,
       });
