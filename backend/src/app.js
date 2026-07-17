@@ -149,7 +149,7 @@ const allowedOrigins = [
   "https://dryvsquad.com",
 
   // Current Production Frontend
-  "https://vaahan-international-brl9.vercel.app",
+  "https://vaahan-international-swart.vercel.app",
 
   // Environment Variable
   process.env.FRONTEND_URL,
