@@ -10,7 +10,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://10.15.251.49:8001/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vaahan-international-1-yro3.onrender.com/api/v1';
 
 const client = axios.create({
   baseURL: API_BASE_URL,
