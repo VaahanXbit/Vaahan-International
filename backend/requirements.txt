@@ -40,3 +40,6 @@ pytest-asyncio==0.21.1
 
 # Optional: Database client tools
 alembic==1.12.1
+
+# FastAPI Form Parsing support
+python-multipart==0.0.9
