@@ -16,15 +16,18 @@
 ================================================================================
 """
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from typing import Generator
 import os
 import logging
+from dotenv import load_dotenv
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ============================================================================
 # DATABASE CONFIGURATION
@@ -171,7 +174,7 @@ def verify_db_connection() -> bool:
     try:
         with engine.connect() as conn:
             # Simple test query
-            result = conn.execute("SELECT 1")
+            result = conn.execute(text("SELECT 1"))
             logger.info("  Database connection verified")
             return True
     except Exception as e:
@@ -191,17 +194,17 @@ def receive_connect(dbapi_conn, connection_record):
     Usage: Enable foreign key constraints, set connection parameters
     """
     # For SQLite, enable foreign keys
-    # For PostgreSQL, this may not be needed as it's enabled by default
     try:
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
-        logger.debug("Foreign key constraints enabled")
+        if dbapi_conn.__class__.__module__.startswith("sqlite3"):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+            logger.debug("Foreign key constraints enabled for SQLite")
     except Exception as e:
-        logger.debug(f"Could not enable foreign keys (PostgreSQL doesn't need this): {e}")
+        logger.debug(f"Could not enable foreign keys: {e}")
 
 
-@event.listens_for(engine, "pool_connect")
+@event.listens_for(engine.pool, "connect")
 def receive_pool_connect(dbapi_conn, connection_record):
     """
     Called when a connection is retrieved from the pool
@@ -209,7 +212,7 @@ def receive_pool_connect(dbapi_conn, connection_record):
     logger.debug("Connection retrieved from pool")
 
 
-@event.listens_for(engine, "pool_checkout")
+@event.listens_for(engine.pool, "checkout")
 def receive_pool_checkout(dbapi_conn, connection_record, connection_proxy):
     """
     Called when a connection is checked out from the pool
@@ -217,7 +220,7 @@ def receive_pool_checkout(dbapi_conn, connection_record, connection_proxy):
     pass
 
 
-@event.listens_for(engine, "pool_checkin")
+@event.listens_for(engine.pool, "checkin")
 def receive_pool_checkin(dbapi_conn, connection_record):
     """
     Called when a connection is returned to the pool
@@ -249,6 +252,8 @@ if __name__ == "__main__":
     # Test database connection on module run
     logger.info("Testing database connection...")
     if verify_db_connection():
-        logger.info("Connection successful!")
+        logger.info("Connection successful! Initializing database tables...")
+        init_db()
+        logger.info("Tables created successfully!")
     else:
         logger.error("Connection failed!")

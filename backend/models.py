@@ -29,9 +29,8 @@
 ================================================================================
 """
 
-from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, ForeignKey, Numeric, Date, BigInteger
+from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, ForeignKey, Numeric, Date, BigInteger, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -66,7 +65,10 @@ class Company(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     phone = Column(String(20))
     city = Column(String(100))
+    state = Column(String(100))
+    address = Column(Text)
     gst_number = Column(String(50), unique=True)
+    plan_type = Column(String(20), default="starter")  # starter, pro, enterprise
     subscription_status = Column(String(50), default="active")  # active, suspended
     total_drivers = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -76,6 +78,7 @@ class Company(Base):
     drivers = relationship("Driver", back_populates="company", cascade="all, delete-orphan")
     vehicles = relationship("Vehicle", back_populates="company", cascade="all, delete-orphan")
     trips = relationship("Trip", back_populates="company", cascade="all, delete-orphan")
+    daily_scores = relationship("DailyScore", back_populates="company", cascade="all, delete-orphan")
 
 
 # ============================================================================
@@ -111,6 +114,8 @@ class Driver(Base):
     name = Column(String(255), nullable=False)
     license_number = Column(String(50))
     license_expiry = Column(Date)
+    aadhaar_number = Column(String(255))
+    onboarded_by = Column(String(20))
     status = Column(String(50), default="active")  # active, suspended, deleted
     documents_json = Column(JSON)  # {license, rc, insurance URLs}
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -210,7 +215,7 @@ class Trip(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
     driver_id = Column(UUID(as_uuid=True), ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False, index=True)
-    vehicle_id = Column(UUID(as_uuid=True), ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False)
+    vehicle_id = Column(UUID(as_uuid=True), ForeignKey("vehicles.id", ondelete="SET NULL"), nullable=True)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime)
     start_location = Column(JSON)  # {lat, lng}
@@ -222,6 +227,7 @@ class Trip(Base):
     speeding_count = Column(Integer, default=0)
     harsh_corner_count = Column(Integer, default=0)
     status = Column(String(50), default="active")  # active, completed, paused
+    notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -258,7 +264,7 @@ class GPSCoordinate(Base):
     Index on (trip_id, timestamp DESC) for quick replay
     Partial index for recent data (last 30 days)
     """
-    __tablename__ = "gps_coordinates"
+    __tablename__ = "gps_points"
     
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -307,7 +313,7 @@ class TripEvent(Base):
     severity = Column(Numeric(3, 2))  # 0 to 1
     latitude = Column(Numeric(9, 6))
     longitude = Column(Numeric(9, 6))
-    metadata = Column(JSON)  # {speed, threshold, deceleration, etc.}
+    event_metadata = Column("metadata", JSON)  # {speed, threshold, deceleration, etc.}
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -346,7 +352,7 @@ class DailyScore(Base):
     Calculated at 11:59 PM every night by Celery job
     Visible to driver and fleet owner next morning
     """
-    __tablename__ = "daily_scores"
+    __tablename__ = "driver_daily_scores"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True)

@@ -10,7 +10,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://10.15.251.49:8001/api/v1';
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -34,5 +34,14 @@ client.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export const api = {
+  loginCompany: (email) => client.post(`/auth/login-company?email=${encodeURIComponent(email)}`),
+  registerCompany: (name, email, phone, city, gst) => 
+    client.post(`/auth/register-company?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}&city=${encodeURIComponent(city)}&gst_number=${encodeURIComponent(gst)}`),
+  getDashboard: (companyId) => client.get(`/fleet/dashboard?company_id=${companyId}`),
+  getDrivers: (companyId) => client.get(`/fleet/drivers?company_id=${companyId}`),
+  getVehicles: (companyId) => client.get(`/fleet/vehicles?company_id=${companyId}`),
+};
 
 export default client;

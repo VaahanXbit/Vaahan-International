@@ -26,7 +26,7 @@ import logging
 
 # Import database and models
 from database import get_db
-from models import Company, Driver
+from models import Company, Driver, Vehicle
 
 # Import authentication utilities
 from auth import JWTManager, PasswordManager, OTPManager
@@ -126,6 +126,43 @@ async def register_company(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to register company"
+        )
+
+
+@router.post("/login-company", tags=["Company"])
+async def login_company(
+    email: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Company login - TESTING-ONLY STOPGAP (No password check!)
+    
+    Checks if a company exists by email and returns their profile.
+    """
+    # NOTE: This endpoint has no password check and is a testing-only stopgap for development/testing.
+    try:
+        company = db.query(Company).filter(Company.email == email).first()
+        if not company:
+            logger.warning(f"⚠️  Company login failed - email not found: {email}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company not registered with this email address"
+            )
+            
+        logger.info(f"  Company login successful: {company.name} (ID: {company.id})")
+        return {
+            "status": "success",
+            "company_id": str(company.id),
+            "name": company.name,
+            "email": company.email
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Company login error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to login company"
         )
 
 
@@ -273,17 +310,49 @@ async def verify_driver(
                 detail="Driver already registered with this phone number"
             )
         
-        # Create driver account
+        # Get or create vehicle & company for the driver
+        vehicle = db.query(Vehicle).filter(Vehicle.vehicle_number == vehicle_number).first()
+        if not vehicle:
+            # Look for existing company, or create a default one
+            company = db.query(Company).first()
+            if not company:
+                company = Company(
+                    name="Default Fleet",
+                    email="fleet@example.com",
+                    phone="9999999999",
+                    city="Default City",
+                    gst_number="29DUMMY1234F1Z0",
+                    subscription_status="active"
+                )
+                db.add(company)
+                db.commit()
+                db.refresh(company)
+            
+            # Create the vehicle
+            vehicle = Vehicle(
+                company_id=company.id,
+                vehicle_number=vehicle_number,
+                vehicle_type="truck",
+                status="active"
+            )
+            db.add(vehicle)
+            db.commit()
+            db.refresh(vehicle)
+        
+        # Create driver account under the same company
         driver = Driver(
             phone_number=phone_number,
             name=name,
-            vehicle_number=vehicle_number,
+            company_id=vehicle.company_id,
             status="active"
         )
-        
         db.add(driver)
         db.commit()
         db.refresh(driver)
+        
+        # Link the vehicle to the driver
+        vehicle.driver_id = driver.id
+        db.commit()
         
         # Create JWT tokens
         access_token = JWTManager.create_access_token(

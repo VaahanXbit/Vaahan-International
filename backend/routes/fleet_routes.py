@@ -24,7 +24,15 @@ async def get_fleet_drivers(company_id: str, limit: int = 50, db: Session = Depe
         drivers = db.query(Driver).filter(Driver.company_id == company_id).limit(limit).all()
         return {
             "status": "success",
-            "drivers": [{"id": str(d.id), "name": d.name, "phone": d.phone_number} for d in drivers]
+            "drivers": [
+                {
+                    "id": str(d.id),
+                    "name": d.name,
+                    "phone": d.phone_number,
+                    "status": d.status
+                }
+                for d in drivers
+            ]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to get drivers")
@@ -53,7 +61,15 @@ async def get_fleet_vehicles(company_id: str, db: Session = Depends(get_db)):
         vehicles = db.query(Vehicle).filter(Vehicle.company_id == company_id).all()
         return {
             "status": "success",
-            "vehicles": [{"id": str(v.id), "number": v.vehicle_number} for v in vehicles]
+            "vehicles": [
+                {
+                    "id": str(v.id),
+                    "number": v.vehicle_number,
+                    "fastag_id": v.fastag_id,
+                    "fastag_balance": float(v.fastag_balance or 0)
+                }
+                for v in vehicles
+            ]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to get vehicles")
