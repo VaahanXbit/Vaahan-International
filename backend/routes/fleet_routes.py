@@ -66,7 +66,8 @@ async def get_fleet_vehicles(company_id: str, db: Session = Depends(get_db)):
                     "id": str(v.id),
                     "number": v.vehicle_number,
                     "fastag_id": v.fastag_id,
-                    "fastag_balance": float(v.fastag_balance or 0)
+                    "fastag_balance": float(v.fastag_balance or 0),
+                    "driver_id": str(v.driver_id) if v.driver_id else None
                 }
                 for v in vehicles
             ]

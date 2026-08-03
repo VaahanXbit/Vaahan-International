@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "fleet-owner-app",
+    "slug": "fleet-owner-app",
+    "version": "1.0.0",
+    "android": {
+      "package": "com.shravani_2906.fleetownerapp",
+      "config": {
+        "googleMaps": {
+          "// note": "Before building a standalone/production APK, obtain a real API key from Google Cloud Console and paste it here. Testing in Expo Go works out of the box using Expo's dev keys.",
+          "apiKey": "YOUR_ANDROID_GOOGLE_MAPS_API_KEY_HERE"
+        }
+      }
+    }
+  }
+}

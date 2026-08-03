@@ -10,7 +10,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://vaahan-international-1-yro3.onrender.com/api/v1';
+const API_BASE_URL ='http://10.15.251.49:8001/api/v1';
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -42,6 +42,11 @@ export const api = {
   getDashboard: (companyId) => client.get(`/fleet/dashboard?company_id=${companyId}`),
   getDrivers: (companyId) => client.get(`/fleet/drivers?company_id=${companyId}`),
   getVehicles: (companyId) => client.get(`/fleet/vehicles?company_id=${companyId}`),
+  getActiveTrips: (companyId) => client.get(`/fleet/active-trips?company_id=${companyId}`),
+  getScores: (companyId) => client.get(`/fleet/scores?company_id=${companyId}`),
+  listTrips: (driverId) => client.get(`/trips?driver_id=${driverId}`),
+  getTrip: (tripId) => client.get(`/trips/${tripId}`),
+  getCurrentUser: () => client.get('/auth/me'),
 };
 
 export default client;

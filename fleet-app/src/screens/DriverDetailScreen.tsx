@@ -17,6 +17,45 @@ import { Gauge } from '../components/Gauge';
 import { TelemetryChart } from '../components/TelemetryChart';
 import { AddDriverModal } from '../components/AddDriverModal';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSelector } from 'react-redux';
+import MapView, { Marker, Polyline } from 'react-native-maps';
+import { api } from '../api/client';
+
+const CITY_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
+  'bangalore': { latitude: 12.9716, longitude: 77.5946 },
+  'bengaluru': { latitude: 12.9716, longitude: 77.5946 },
+  'mumbai': { latitude: 19.0760, longitude: 72.8777 },
+  'delhi': { latitude: 28.7041, longitude: 77.1025 },
+  'new delhi': { latitude: 28.6139, longitude: 77.2090 },
+  'gurugram': { latitude: 28.4595, longitude: 77.0266 },
+  'gurgaon': { latitude: 28.4595, longitude: 77.0266 },
+  'pune': { latitude: 18.5204, longitude: 73.8567 },
+  'chennai': { latitude: 13.0827, longitude: 80.2707 },
+  'hyderabad': { latitude: 17.3850, longitude: 78.4867 },
+  'kolkata': { latitude: 22.5726, longitude: 88.3639 },
+};
+
+const darkMapStyle = [
+  { "elementType": "geometry", "stylers": [{ "color": "#0f0f12" }] },
+  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#0f0f12" }] },
+  { "elementType": "labels.text.fill", "stylers": [{ "color": "#746855" }] },
+  { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [{ "color": "#d59563" }] },
+  { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#d59563" }] },
+  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#111215" }] },
+  { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{ "color": "#6b9a76" }] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#191a23" }] },
+  { "featureType": "road", "elementType": "geometry.stroke", "stylers": [{ "color": "#2a2b37" }] },
+  { "featureType": "road", "elementType": "labels.text.fill", "stylers": [{ "color": "#64748b" }] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#6366f1" }, { "weight": 1 }] },
+  { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [{ "color": "#4f46e5" }] },
+  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{ "color": "#f8fafc" }] },
+  { "featureType": "transit", "elementType": "geometry", "stylers": [{ "color": "#191a23" }] },
+  { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [{ "color": "#d59563" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0b0c10" }] },
+  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#515c6d" }] },
+  { "featureType": "water", "elementType": "labels.stroke", "stylers": [{ "color": "#17263c" }] }
+];
+
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DriverDetail'>;
 
@@ -26,13 +65,60 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [gpsPoints, setGpsPoints] = useState<{ lat: number; lng: number; timestamp: string }[]>([]);
+
+  const companyCity = useSelector((state: any) => state.auth.user?.city);
+  const lowercaseCity = (companyCity || 'bangalore').trim().toLowerCase();
+  const defaultCoords = CITY_COORDINATES[lowercaseCity] || CITY_COORDINATES['bangalore'];
+
+  const hasGpsData = gpsPoints && gpsPoints.length > 0;
+
+  // Center map on last tracked coordinate, or default to geocoded company city
+  const initialRegion = hasGpsData
+    ? {
+        latitude: gpsPoints[gpsPoints.length - 1].lat,
+        longitude: gpsPoints[gpsPoints.length - 1].lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }
+    : {
+        latitude: defaultCoords.latitude,
+        longitude: defaultCoords.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
 
   useEffect(() => {
-    // TODO(backend): Confirm this matches real API response shape before
-    // wiring in.
     getDriverDetail(driverId).then(data => {
       setDriver(data);
       setLoading(false);
+
+      // Fetch active trip coordinates from backend
+      api.listTrips(driverId)
+        .then(res => {
+          if (res.data?.trips?.length > 0) {
+            const activeTrip = res.data.trips.find((t: any) => t.status === 'active');
+            if (activeTrip) {
+              api.getTrip(activeTrip.id)
+                .then(tripRes => {
+                  if (tripRes.data?.gps_points) {
+                    const points = tripRes.data.gps_points.map((p: any) => ({
+                      lat: parseFloat(p.latitude),
+                      lng: parseFloat(p.longitude),
+                      timestamp: p.timestamp,
+                    }));
+                    setGpsPoints(points);
+                  }
+                })
+                .catch(err => console.error('Error fetching active trip details:', err));
+            } else {
+              setGpsPoints([]);
+            }
+          } else {
+            setGpsPoints([]);
+          }
+        })
+        .catch(err => console.error('Error listing trips for driver:', err));
     });
   }, [driverId, refreshTrigger]);
 
@@ -95,13 +181,6 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={styles.appBarActions}>
           <TouchableOpacity
             style={styles.appBarButton}
-            onPress={() => setEditModalOpen(true)}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="edit" size={22} color={theme.colors.onSurface} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.appBarButton}
             onPress={handleDeletePress}
             activeOpacity={0.7}
           >
@@ -111,175 +190,6 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Main Score Gauge */}
-        {driver.enabledProducts.includes('driver_safety') && (
-          <TouchableOpacity
-            style={styles.gaugeCard}
-            onPress={() => navigation.navigate('FeatureDetail', { feature: 'driver_safety', driverId: driver.id })}
-            activeOpacity={0.8}
-          >
-            <Gauge
-              value={driver.efficiencyScore}
-              displayValue={`${driver.efficiencyScore}`}
-              labelText="Efficiency Score"
-              size="lg"
-              thresholds={{ red: 50, amber: 75 }}
-            />
-          </TouchableOpacity>
-        )}
-
-        {/* Small Gauges Grid */}
-        {driver.enabledProducts.includes('smart_fuel_audit') && (
-          <View style={styles.smallGaugesRow}>
-            <TouchableOpacity
-              style={styles.statCard}
-              onPress={() => navigation.navigate('FeatureDetail', { feature: 'smart_fuel_audit', driverId: driver.id })}
-              activeOpacity={0.8}
-            >
-              <Gauge
-                value={driver.fuelLevel}
-                displayValue={`${driver.fuelLevel}%`}
-                labelText="Fuel Level"
-                size="sm"
-                thresholds={{ red: 20, amber: 50 }}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.statCard}
-              onPress={() => navigation.navigate('FeatureDetail', { feature: 'smart_fuel_audit', driverId: driver.id })}
-              activeOpacity={0.8}
-            >
-              <Gauge
-                value={Math.max(0, 100 - Math.abs(driver.mileageDiff * 4))}
-                displayValue={`${driver.mileageDiff > 0 ? '+' : ''}${driver.mileageDiff}%`}
-                labelText="Mileage Diff"
-                size="sm"
-                thresholds={{ red: 30, amber: 65 }}
-              />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* 7-day Fuel Telemetry Sparkline/Line Chart */}
-        {driver.enabledProducts.includes('smart_fuel_audit') && (
-          <>
-            <View style={styles.sectionHeader}>
-              <Text style={[theme.typography.labelCaps, styles.sectionTitle]}>7-DAY FUEL TELEMETRY</Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('FeatureDetail', { feature: 'smart_fuel_audit', driverId: driver.id })}
-              activeOpacity={0.8}
-            >
-              <TelemetryChart data={driver.telemetryHistory} />
-            </TouchableOpacity>
-          </>
-        )}
-
-        {/* Active Solution Alerts */}
-        {(driver.enabledProducts.includes('engine_health') ||
-          driver.enabledProducts.includes('fastag_monitor') ||
-          driver.enabledProducts.includes('rto_locker')) && (
-          <>
-            <View style={styles.sectionHeader}>
-              <Text style={[theme.typography.labelCaps, styles.sectionTitle]}>SOLUTION ALERTS</Text>
-            </View>
-
-            <View style={styles.alertsContainer}>
-              {(() => {
-                const activeAlerts = driver.alerts.filter(
-                  alert => driver.enabledProducts.includes(alert.category)
-                );
-
-                const combinedItems: {
-                  id: string;
-                  title: string;
-                  remainingInfo: string;
-                  status: 'warning' | 'critical' | 'success';
-                  category: 'engine_health' | 'fastag_monitor' | 'rto_locker';
-                }[] = [...activeAlerts];
-
-                const categoriesToCheck: ('engine_health' | 'fastag_monitor' | 'rto_locker')[] = [
-                  'engine_health',
-                  'fastag_monitor',
-                  'rto_locker',
-                ];
-
-                categoriesToCheck.forEach(cat => {
-                  if (driver.enabledProducts.includes(cat)) {
-                    const hasAlert = activeAlerts.some(a => a.category === cat);
-                    if (!hasAlert) {
-                      if (cat === 'fastag_monitor') {
-                        combinedItems.push({
-                          id: `status-${cat}`,
-                          title: 'Fastag Wallet',
-                          remainingInfo: 'Balance Optimal',
-                          status: 'success',
-                          category: cat,
-                        });
-                      } else if (cat === 'engine_health') {
-                        combinedItems.push({
-                          id: `status-${cat}`,
-                          title: 'Engine Status',
-                          remainingInfo: 'Diagnostics Normal',
-                          status: 'success',
-                          category: cat,
-                        });
-                      } else if (cat === 'rto_locker') {
-                        combinedItems.push({
-                          id: `status-${cat}`,
-                          title: 'RTO Locker',
-                          remainingInfo: 'All Documents Valid',
-                          status: 'success',
-                          category: cat,
-                        });
-                      }
-                    }
-                  }
-                });
-
-                if (combinedItems.length > 0) {
-                  return combinedItems.map(item => {
-                    const statusDotColor = 
-                      item.status === 'critical' 
-                        ? theme.colors.error 
-                        : item.status === 'warning' 
-                        ? '#d97706' 
-                        : '#10b981';
-
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={styles.alertRow}
-                        onPress={() => navigation.navigate('FeatureDetail', { feature: item.category, driverId: driver.id })}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.alertLeft}>
-                          <View style={[styles.statusDot, { backgroundColor: statusDotColor }]} />
-                          <Text style={[theme.typography.bodyMd, { color: theme.colors.onSurface, fontWeight: '500' }]}>
-                            {item.title}
-                          </Text>
-                        </View>
-                        <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant, fontSize: 10 }]}>
-                          {item.remainingInfo}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  });
-                }
-
-                return (
-                  <View style={styles.emptyBox}>
-                    <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant }]}>
-                      NO ACTIVE ALERTS
-                    </Text>
-                  </View>
-                );
-              })()}
-            </View>
-          </>
-        )}
-
         {/* Recent Trips Log */}
         {driver.enabledProducts.includes('live_trip_tracker') && (
           <>
@@ -292,6 +202,45 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               activeOpacity={0.8}
               style={styles.tripsContainer}
             >
+              <View style={styles.mapWrapper}>
+                <MapView
+                  style={styles.map}
+                  initialRegion={initialRegion}
+                  customMapStyle={darkMapStyle}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                  pitchEnabled={false}
+                  rotateEnabled={false}
+                >
+                  {hasGpsData && (
+                    <>
+                      <Polyline
+                        coordinates={gpsPoints.map(p => ({ latitude: p.lat, longitude: p.lng }))}
+                        strokeColor={theme.colors.primary}
+                        strokeWidth={3}
+                      />
+                      <Marker
+                        coordinate={{
+                          latitude: gpsPoints[gpsPoints.length - 1].lat,
+                          longitude: gpsPoints[gpsPoints.length - 1].lng,
+                        }}
+                        anchor={{ x: 0.5, y: 0.5 }}
+                      >
+                        <View style={styles.truckMarker}>
+                          <MaterialIcons name="local-shipping" size={14} color="#000" />
+                        </View>
+                      </Marker>
+                    </>
+                  )}
+                </MapView>
+                {!hasGpsData && (
+                  <View style={styles.emptyOverlay}>
+                    <MaterialIcons name="map" size={24} color={theme.colors.onSurfaceVariant} />
+                    <Text style={styles.emptyText}>No trip data recorded yet</Text>
+                  </View>
+                )}
+              </View>
+
               {driver.trips.length > 0 ? (
                 driver.trips.map(trip => (
                   <View key={trip.id} style={styles.tripRow}>
@@ -319,6 +268,137 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 </View>
               )}
             </TouchableOpacity>
+          </>
+        )}
+
+        {/* Main Score Gauge */}
+        {driver.enabledProducts.includes('driver_safety') && (
+          <TouchableOpacity
+            style={styles.gaugeCard}
+            onPress={() => navigation.navigate('FeatureDetail', { feature: 'driver_safety', driverId: driver.id })}
+            activeOpacity={0.8}
+          >
+            <Gauge
+              value={driver.efficiencyScore}
+              displayValue={`${driver.efficiencyScore}`}
+              labelText="Efficiency Score"
+              size="lg"
+              thresholds={{ red: 50, amber: 75 }}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* Small Gauges Grid */}
+        {driver.enabledProducts.includes('smart_fuel_audit') && (
+          <View style={styles.smallGaugesRow}>
+            <TouchableOpacity
+              style={styles.statCard}
+              onPress={() => navigation.navigate('FeatureDetail', { feature: 'smart_fuel_audit', driverId: driver.id })}
+              activeOpacity={0.8}
+            >
+              <Gauge
+                value={0}
+                displayValue="N/A"
+                labelText="Fuel Level (Not Tracked)"
+                size="sm"
+                thresholds={{ red: 20, amber: 50 }}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCard}
+              onPress={() => navigation.navigate('FeatureDetail', { feature: 'smart_fuel_audit', driverId: driver.id })}
+              activeOpacity={0.8}
+            >
+              <Gauge
+                value={0}
+                displayValue="N/A"
+                labelText="Mileage Diff (Not Tracked)"
+                size="sm"
+                thresholds={{ red: 30, amber: 65 }}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 7-day Fuel Telemetry Sparkline/Line Chart */}
+        {driver.enabledProducts.includes('smart_fuel_audit') && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={[theme.typography.labelCaps, styles.sectionTitle]}>7-DAY FUEL TELEMETRY</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('FeatureDetail', { feature: 'smart_fuel_audit', driverId: driver.id })}
+              activeOpacity={0.8}
+              style={[styles.gaugeCard, { paddingVertical: 24 }]}
+            >
+              <Text style={[theme.typography.bodyMd, { color: theme.colors.onSurfaceVariant }]}>
+                Not tracked yet (No fuel telemetry database source configured)
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Driver Stats (Three Small Cards Row) */}
+        {(driver.enabledProducts.includes('engine_health') ||
+          driver.enabledProducts.includes('fastag_monitor') ||
+          driver.enabledProducts.includes('rto_locker')) && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={[theme.typography.labelCaps, styles.sectionTitle]}>DRIVER STATS</Text>
+            </View>
+            <View style={styles.threeCardsRow}>
+              {/* Card 1: Fastag Wallet */}
+              {driver.enabledProducts.includes('fastag_monitor') && (() => {
+                const alert = driver.alerts.find(a => a.category === 'fastag_monitor');
+                const isLow = alert && alert.status === 'critical';
+                const statusColor = isLow ? theme.colors.error : '#10b981';
+                const balance = alert?.remainingInfo || 'Balance Optimal';
+                return (
+                  <TouchableOpacity
+                    style={styles.smallStatCard}
+                    onPress={() => navigation.navigate('FeatureDetail', { feature: 'fastag_monitor', driverId: driver.id })}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialIcons name="account-balance-wallet" size={24} color={statusColor} style={{ marginBottom: 6 }} />
+                    <Text style={styles.smallStatLabel}>Fastag Wallet</Text>
+                    <Text style={[styles.smallStatVal, { color: statusColor }]} numberOfLines={1} adjustsFontSizeToFit>
+                      {balance}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })()}
+
+              {/* Card 2: Engine Status */}
+              {driver.enabledProducts.includes('engine_health') && (() => {
+                return (
+                  <TouchableOpacity
+                    style={styles.smallStatCard}
+                    onPress={() => navigation.navigate('FeatureDetail', { feature: 'engine_health', driverId: driver.id })}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialIcons name="speed" size={24} color="#d97706" style={{ marginBottom: 6 }} />
+                    <Text style={styles.smallStatLabel}>Engine Status</Text>
+                    <Text style={[styles.smallStatVal, { color: '#d97706' }]}>Not tracked</Text>
+                  </TouchableOpacity>
+                );
+              })()}
+
+              {/* Card 3: RTO Locker */}
+              {driver.enabledProducts.includes('rto_locker') && (() => {
+                return (
+                  <TouchableOpacity
+                    style={styles.smallStatCard}
+                    onPress={() => navigation.navigate('FeatureDetail', { feature: 'rto_locker', driverId: driver.id })}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialIcons name="description" size={24} color="#10b981" style={{ marginBottom: 6 }} />
+                    <Text style={styles.smallStatLabel}>RTO Locker</Text>
+                    <Text style={[styles.smallStatVal, { color: '#10b981' }]}>All Valid</Text>
+                  </TouchableOpacity>
+                );
+              })()}
+            </View>
           </>
         )}
       </ScrollView>
@@ -404,30 +484,34 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: theme.colors.onSurfaceVariant,
   },
-  alertsContainer: {
+  threeCardsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  smallStatCard: {
+    flex: 1,
     backgroundColor: theme.colors.surfaceContainer,
     borderRadius: theme.rounded.lg,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
     borderWidth: 1,
     borderColor: theme.colors.outlineVariant,
-    paddingHorizontal: 16,
-  },
-  alertRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: theme.colors.surfaceContainerLow,
+    justifyContent: 'center',
   },
-  alertLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  smallStatLabel: {
+    color: theme.colors.onSurfaceVariant,
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: theme.rounded.full,
+  smallStatVal: {
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   tripsContainer: {
     backgroundColor: theme.colors.surfaceContainer,
@@ -456,6 +540,40 @@ const styles = StyleSheet.create({
   emptyBox: {
     alignItems: 'center',
     paddingVertical: 24,
+  },
+  mapWrapper: {
+    height: 150,
+    borderRadius: theme.rounded.md,
+    overflow: 'hidden',
+    position: 'relative',
+    marginTop: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.outlineVariant,
+  },
+  map: {
+    flex: 1,
+  },
+  emptyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 15, 18, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  emptyText: {
+    color: theme.colors.onSurfaceVariant,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  truckMarker: {
+    backgroundColor: theme.colors.primary,
+    padding: 6,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 export default DriverDetailScreen;

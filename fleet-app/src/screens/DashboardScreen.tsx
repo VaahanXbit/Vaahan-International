@@ -33,25 +33,7 @@ export const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const companyId = useSelector((state: any) => state.auth.user?.companyId);
 
   useEffect(() => {
-    if (!companyId) return;
-
-    Promise.all([
-      api.getDashboard(companyId),
-      getDashboardData()
-    ]).then(([liveRes, mockData]) => {
-      if (liveRes.data?.status === 'success') {
-        setDashboardData({
-          vehiclesCount: liveRes.data.total_drivers, // Use driver count as proxy
-          fleetMileage: mockData.fleetMileage,
-          activities: mockData.activities
-        });
-      } else {
-        setDashboardData(mockData);
-      }
-    }).catch(err => {
-      console.error('Error fetching live dashboard stats:', err);
-      getDashboardData().then(setDashboardData);
-    });
+    getDashboardData().then(setDashboardData);
   }, [refreshTrigger, companyId]);
 
   const handleSelectDriver = (driverId: string) => {
@@ -132,8 +114,12 @@ export const DashboardScreen: React.FC<Props> = ({ navigation }) => {
         {/* Full width Fleet Mileage card */}
         <View style={styles.statCardFull}>
           <Text style={[theme.typography.labelCaps, styles.statLabel]}>FLEET MILEAGE</Text>
-          <Text style={styles.statValLarge}>
-            {dashboardData ? dashboardData.fleetMileage.toLocaleString() : '--'}
+          <Text style={[styles.statValLarge, typeof dashboardData?.fleetMileage === 'string' && { fontSize: 24 }]}>
+            {dashboardData
+              ? (typeof dashboardData.fleetMileage === 'number'
+                  ? `${dashboardData.fleetMileage.toLocaleString()} km`
+                  : dashboardData.fleetMileage)
+              : '--'}
           </Text>
           <Text style={[theme.typography.labelCaps, styles.statSubtext]}>
             +12% vs last month

@@ -28,7 +28,7 @@ from datetime import datetime
 from database import engine, Base, SessionLocal
 
 # Import route modules
-from routes import auth_routes, trip_routes, score_routes, fleet_routes
+from routes import auth_routes, trip_routes, score_routes, fleet_routes, driver_socket
 
 # Configure logging
 logging.basicConfig(
@@ -183,6 +183,12 @@ app.include_router(
     fleet_routes.router,
     prefix="/api/v1/fleet",
     tags=["Fleet"]
+)
+
+# Driver Telemetry WebSocket Routes
+app.include_router(
+    driver_socket.router,
+    tags=["Driver Telemetry"]
 )
 
 logger.info("  All route modules registered")

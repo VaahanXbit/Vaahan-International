@@ -115,7 +115,8 @@ async def register_company(
             "status": "success",
             "message": "Company registered successfully",
             "company_id": str(company.id),
-            "email": company.email
+            "email": company.email,
+            "city": company.city
         }
         
     except HTTPException:
@@ -154,7 +155,8 @@ async def login_company(
             "status": "success",
             "company_id": str(company.id),
             "name": company.name,
-            "email": company.email
+            "email": company.email,
+            "city": company.city
         }
     except HTTPException:
         raise

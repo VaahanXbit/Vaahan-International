@@ -1,12 +1,17 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useSelector } from 'react-redux';
 import theme from '../theme';
 
 export const ProfileScreen: React.FC = () => {
+  const companyEmail = useSelector((state: any) => state.auth.user?.email);
+
   return (
     <View style={styles.container}>
-      <Text style={[theme.typography.headlineMd, styles.text]}>Profile Screen</Text>
-      <Text style={[theme.typography.bodyMd, styles.subtext]}>Placeholder for Company and Fleet Settings</Text>
+      <Text style={[theme.typography.headlineMd, styles.text]}>Company Profile</Text>
+      <Text style={[theme.typography.bodyLg, styles.subtext]}>
+        {companyEmail || 'Not Logged In'}
+      </Text>
     </View>
   );
 };
@@ -20,10 +25,12 @@ const styles = StyleSheet.create({
   },
   text: {
     color: theme.colors.onSurface,
+    fontWeight: '700',
   },
   subtext: {
-    color: theme.colors.onSurfaceVariant,
-    marginTop: 8,
+    color: theme.colors.primary,
+    marginTop: 12,
+    fontWeight: '500',
   },
 });
 

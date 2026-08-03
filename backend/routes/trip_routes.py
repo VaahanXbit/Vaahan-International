@@ -15,22 +15,47 @@
 ================================================================================
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from datetime import datetime
 import logging
 
 from database import get_db
-from models import Trip, GPSCoordinate, TripEvent
+from models import Driver, Trip, GPSCoordinate, TripEvent, Vehicle
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/start")
-async def start_trip(driver_id: str, vehicle_id: str, db: Session = Depends(get_db)):
+async def start_trip(driver_id: str = None, vehicle_id: str = None, db: Session = Depends(get_db)):
     """Start a new trip"""
     try:
+        # Fallback to first driver if none specified or is string 'undefined'/'null'
+        if not driver_id or driver_id in ["undefined", "null", "default"]:
+            driver = db.query(Driver).first()
+            if not driver:
+                raise HTTPException(status_code=404, detail="No drivers seeded in database")
+            driver_id = str(driver.id)
+        else:
+            driver = db.query(Driver).filter(Driver.id == driver_id).first()
+            if not driver:
+                raise HTTPException(status_code=404, detail="Driver not found")
+
+        # Fallback to linked vehicle if none specified or is string 'undefined'/'null'
+        if not vehicle_id or vehicle_id in ["undefined", "null", "default"]:
+            vehicle = db.query(Vehicle).filter(Vehicle.driver_id == driver.id).first()
+            if not vehicle:
+                vehicle = db.query(Vehicle).first()
+            if not vehicle:
+                raise HTTPException(status_code=404, detail="No vehicles seeded in database")
+            vehicle_id = str(vehicle.id)
+        else:
+            vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+            if not vehicle:
+                raise HTTPException(status_code=404, detail="Vehicle not found")
+
         trip = Trip(
+            company_id=driver.company_id,
             driver_id=driver_id,
             vehicle_id=vehicle_id,
             start_time=datetime.utcnow(),
@@ -47,12 +72,17 @@ async def start_trip(driver_id: str, vehicle_id: str, db: Session = Depends(get_
         raise HTTPException(status_code=500, detail="Failed to start trip")
 
 @router.put("/{trip_id}/locations")
-async def update_gps(trip_id: str, gps_points: list, db: Session = Depends(get_db)):
+async def update_gps(trip_id: str, gps_points: list = Body(..., embed=True), db: Session = Depends(get_db)):
     """Update GPS locations for active trip"""
     try:
+        trip = db.query(Trip).filter(Trip.id == trip_id).first()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+
         for point in gps_points:
             gps = GPSCoordinate(
                 trip_id=trip_id,
+                driver_id=trip.driver_id,
                 latitude=point["lat"],
                 longitude=point["lng"],
                 speed_kmh=point.get("speed", 0)

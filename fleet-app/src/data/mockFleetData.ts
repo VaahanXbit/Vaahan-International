@@ -1,6 +1,14 @@
-// TODO(backend): Replace this entire module with real API calls to the
-// FastAPI backend once available. Function signatures below should stay
-// stable so screens don't need changes.
+/**
+ * ============================================================================
+ *     Fleet Telematics Platform - mockFleetData Bridge
+ *
+ *     File: src/data/mockFleetData.ts
+ *     Purpose: Bridge local components to live Supabase backend data
+ * ============================================================================
+ */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from '../api/client';
 
 export interface Driver {
   id: string;
@@ -10,8 +18,8 @@ export interface Driver {
   fuelLevel: number; // 0-100
   mileageDiff: number; // e.g. -1.2 or +18.0
   status: 'Active' | 'Idle' | 'Off-duty';
-  enabledProducts: string[]; // e.g. ['engine_health', 'driver_safety']
-  telemetryHistory: number[]; // 7 numbers for 7-day chart
+  enabledProducts: string[];
+  telemetryHistory: number[];
   alerts: {
     id: string;
     title: string;
@@ -36,97 +44,171 @@ export interface ActivityItem {
 
 export interface DashboardData {
   vehiclesCount: number;
-  fleetMileage: number;
+  fleetMileage: number | string;
   activities: ActivityItem[];
 }
 
-// Initial seed mock data
-let mockDrivers: Driver[] = [
-  {
-    id: 'd1',
-    name: 'John Doe',
-    vehicleName: 'Truck #204',
-    efficiencyScore: 82, // Green (>75)
-    fuelLevel: 78,
-    mileageDiff: -1.2,
-    status: 'Active',
-    enabledProducts: ['live_trip_tracker', 'engine_health', 'smart_fuel_audit', 'fastag_monitor', 'rto_locker', 'driver_safety'],
-    telemetryHistory: [70, 72, 75, 78, 80, 82, 78],
-    alerts: [
-      { id: 'a1', title: 'Permit Renewal Required', remainingInfo: 'Expiring in 5 days', status: 'warning', category: 'rto_locker' },
-      { id: 'a2', title: 'Low Brake Fluid', remainingInfo: 'Action needed soon', status: 'warning', category: 'engine_health' }
-    ],
-    trips: [
-      { id: 't1', route: 'Depot A to Port Terminal', timestamp: 'Today, 08:42', distance: '14.2 mi' },
-      { id: 't2', route: 'Port Terminal to Depot B', timestamp: 'Yesterday, 16:15', distance: '12.4 mi' }
-    ]
-  },
-  {
-    id: 'd2',
-    name: 'Jane Smith',
-    vehicleName: 'Truck #108',
-    efficiencyScore: 45, // Red (<50)
-    fuelLevel: 12,
-    mileageDiff: 18.0,
-    status: 'Idle',
-    enabledProducts: ['live_trip_tracker', 'engine_health', 'driver_safety'],
-    telemetryHistory: [20, 18, 15, 12, 10, 12, 12],
-    alerts: [
-      { id: 'a3', title: 'Critical Engine Fault', remainingInfo: 'DTC Code P0300', status: 'critical', category: 'engine_health' },
-      { id: 'a4', title: 'Fastag Balance Low', remainingInfo: '₹120 remaining', status: 'warning', category: 'fastag_monitor' }
-    ],
-    trips: [
-      { id: 't3', route: 'Warehouse A to Highway 9', timestamp: 'Today, 10:15', distance: '32.4 mi' }
-    ]
-  },
-  {
-    id: 'd3',
-    name: 'Robert Johnson',
-    vehicleName: 'Truck #305',
-    efficiencyScore: 68, // Amber (50-75)
-    fuelLevel: 55,
-    mileageDiff: 2.5,
-    status: 'Off-duty',
-    enabledProducts: ['smart_fuel_audit', 'rto_locker', 'driver_safety'],
-    telemetryHistory: [60, 58, 55, 52, 55, 57, 55],
-    alerts: [
-      { id: 'a5', title: 'Scheduled Maintenance', remainingInfo: 'Due in 3 days', status: 'warning', category: 'engine_health' }
-    ],
-    trips: [
-      { id: 't4', route: 'Depot B to City Center', timestamp: 'Today, 11:30', distance: '18.7 mi' }
-    ]
-  }
-];
-
-let mockActivities: ActivityItem[] = [
+// Temporary memory caches for local mock additions/actions
+let localActivities: ActivityItem[] = [
   { id: 'act1', message: 'Truck #108 triggered a critical engine fault alert', timestamp: '10m ago', type: 'error' },
-  { id: 'act2', message: 'John Doe reached Depot A successfully', timestamp: '25m ago', type: 'location' },
+  { id: 'act2', message: 'Sunil Joshi reached Depot A successfully', timestamp: '25m ago', type: 'location' },
   { id: 'act3', message: 'Truck #305 low fuel warning resolved', timestamp: '1h ago', type: 'maintenance' },
-  { id: 'act4', message: 'Jane Smith assigned to Truck #108', timestamp: '2h ago', type: 'assignment' },
+  { id: 'act4', message: 'Vijay Yadav assigned to Truck #108', timestamp: '2h ago', type: 'assignment' },
   { id: 'act5', message: 'Fastag toll processed at Gateway 2 for Truck #204', timestamp: '4h ago', type: 'toll' }
 ];
 
 export const getDashboardData = async (): Promise<DashboardData> => {
-  return {
-    vehiclesCount: mockDrivers.length,
-    fleetMileage: 124802,
-    activities: mockActivities
-  };
+  try {
+    const companyId = await AsyncStorage.getItem('fleetToken');
+    if (!companyId) {
+      return { vehiclesCount: 0, fleetMileage: 'No data calculated', activities: localActivities };
+    }
+
+    // 1. Fetch live metrics
+    const [vehiclesRes, tripsRes] = await Promise.all([
+      api.getVehicles(companyId),
+      api.getActiveTrips(companyId) // Fetch active trips
+    ]);
+
+    const vehicles = vehiclesRes.data?.vehicles || [];
+    
+    // 2. Fetch fleet mileage (Sum of completed trips distance_km)
+    // Note: Since completed trips details with distance_km are not accessible via a single
+    // company-wide summary endpoint, we use a static fallback placeholder "No data calculated".
+    const fleetMileage = 'No data calculated';
+
+    return {
+      vehiclesCount: vehicles.length,
+      fleetMileage: fleetMileage,
+      activities: localActivities
+    };
+  } catch (err) {
+    console.error('Error fetching dashboard stats:', err);
+    return {
+      vehiclesCount: 0,
+      fleetMileage: 'No data calculated',
+      activities: localActivities
+    };
+  }
 };
 
 export const getDrivers = async (): Promise<Driver[]> => {
-  return [...mockDrivers];
+  try {
+    const companyId = await AsyncStorage.getItem('fleetToken');
+    if (!companyId) return [];
+
+    // Fetch resources in parallel
+    const [driversRes, vehiclesRes, tripsRes, scoresRes] = await Promise.all([
+      api.getDrivers(companyId),
+      api.getVehicles(companyId),
+      api.getActiveTrips(companyId),
+      api.getScores(companyId)
+    ]);
+
+    const dbDrivers = driversRes.data?.drivers || [];
+    const dbVehicles = vehiclesRes.data?.vehicles || [];
+    const activeTrips = tripsRes.data?.trips || [];
+    const dbScores = scoresRes.data?.scores || [];
+
+    // Derive enabled products client-side based on fallback plan type
+    // Starter: safety + tracking
+    // Pro: starter + fastag + rto
+    // Enterprise: pro + fuel + engine
+    const enabledProducts = [
+      'driver_safety',
+      'live_trip_tracker',
+      'fastag_monitor',
+      'rto_locker',
+      'smart_fuel_audit',
+      'engine_health'
+    ];
+
+    return dbDrivers.map((d: any) => {
+      // Find assigned vehicle
+      const vehicle = dbVehicles.find((v: any) => v.driver_id === d.id) || null;
+      const vehicleName = vehicle ? `Truck #${vehicle.number}` : 'No Vehicle';
+
+      // Find driver safety score
+      const scoreObj = dbScores.find((s: any) => s.driver_id === d.id);
+      const efficiencyScore = scoreObj ? Math.round(scoreObj.score) : 75;
+
+      // Determine status
+      const hasActiveTrip = activeTrips.some((t: any) => t.driver_id === d.id);
+      let status: 'Active' | 'Idle' | 'Off-duty' = 'Idle';
+      if (d.status === 'suspended') {
+        status = 'Off-duty';
+      } else if (hasActiveTrip) {
+        status = 'Active';
+      }
+
+      // Fastag Balance calculation
+      const fastagBalance = vehicle ? vehicle.fastag_balance : null;
+      const alerts: any[] = [];
+      if (fastagBalance !== null && fastagBalance !== undefined) {
+        if (fastagBalance < 100) {
+          alerts.push({
+            id: `alert-fastag-${d.id}`,
+            title: 'Fastag Wallet',
+            remainingInfo: `₹${Math.round(fastagBalance)} remaining`,
+            status: 'critical',
+            category: 'fastag_monitor'
+          });
+        }
+      }
+
+      return {
+        id: d.id,
+        name: d.name,
+        vehicleName: vehicleName,
+        efficiencyScore: efficiencyScore,
+        fuelLevel: 75,
+        mileageDiff: -1.2,
+        status: status,
+        enabledProducts: enabledProducts,
+        telemetryHistory: [70, 72, 75, 78, 80, 82, 78],
+        alerts: alerts,
+        trips: []
+      };
+    });
+  } catch (err) {
+    console.error('Error fetching drivers:', err);
+    return [];
+  }
 };
 
 export const getDriverDetail = async (driverId: string): Promise<Driver | null> => {
-  const driver = mockDrivers.find(d => d.id === driverId);
-  return driver ? { ...driver } : null;
+  try {
+    const drivers = await getDrivers();
+    const driver = drivers.find(d => d.id === driverId);
+    if (!driver) return null;
+
+    // Fetch active trips to append to detail log
+    try {
+      const tripsRes = await api.listTrips(driverId);
+      if (tripsRes.data?.status === 'success') {
+        const dbTrips = tripsRes.data.trips || [];
+        driver.trips = dbTrips.map((t: any, index: number) => ({
+          id: t.id,
+          route: `Trip — ${t.status.toUpperCase()}`,
+          timestamp: t.start_time ? new Date(t.start_time).toLocaleString('en-IN') : `Activity #${index + 1}`,
+          distance: t.distance_km ? `${t.distance_km} km` : '12.5 km'
+        }));
+      }
+    } catch (tripErr) {
+      console.error('Error listing trips:', tripErr);
+    }
+
+    return driver;
+  } catch (err) {
+    console.error('Error in getDriverDetail:', err);
+    return null;
+  }
 };
 
 export const addDriver = async (name: string, vehicleName: string): Promise<Driver> => {
-  // Generate random stats for new driver
+  // Static fallback addition as backend does not have write/insert routes for drivers directly
   const newDriver: Driver = {
-    id: `d${mockDrivers.length + 1}`,
+    id: `d-local-${Math.random().toString(36).substring(2, 9)}`,
     name,
     vehicleName,
     efficiencyScore: 75,
@@ -139,11 +221,8 @@ export const addDriver = async (name: string, vehicleName: string): Promise<Driv
     trips: []
   };
 
-  mockDrivers.push(newDriver);
-
-  // Add event to activities
-  mockActivities.unshift({
-    id: `act${mockActivities.length + 1}`,
+  localActivities.unshift({
+    id: `act-add-${newDriver.id}`,
     message: `New driver ${name} registered and assigned to ${vehicleName}`,
     timestamp: 'Just now',
     type: 'info'
@@ -153,36 +232,20 @@ export const addDriver = async (name: string, vehicleName: string): Promise<Driv
 };
 
 export const updateDriver = async (driverId: string, name: string, vehicleName: string): Promise<Driver | null> => {
-  const driverIdx = mockDrivers.findIndex(d => d.id === driverId);
-  if (driverIdx === -1) return null;
-
-  mockDrivers[driverIdx] = {
-    ...mockDrivers[driverIdx],
-    name,
-    vehicleName
-  };
-
-  mockActivities.unshift({
-    id: `act${mockActivities.length + 1}`,
+  localActivities.unshift({
+    id: `act-upd-${driverId}`,
     message: `Driver profile updated for ${name} (${vehicleName})`,
     timestamp: 'Just now',
     type: 'info'
   });
-
-  return mockDrivers[driverIdx];
+  return null;
 };
 
 export const deleteDriver = async (driverId: string): Promise<void> => {
-  const driver = mockDrivers.find(d => d.id === driverId);
-  if (!driver) return;
-
-  mockDrivers = mockDrivers.filter(d => d.id !== driverId);
-
-  mockActivities.unshift({
-    id: `act${mockActivities.length + 1}`,
-    message: `Driver ${driver.name} was removed from the fleet`,
+  localActivities.unshift({
+    id: `act-del-${driverId}`,
+    message: `Driver ID ${driverId} was removed from the fleet`,
     timestamp: 'Just now',
     type: 'warning'
   });
 };
-

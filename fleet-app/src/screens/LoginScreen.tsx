@@ -102,6 +102,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             name: name.trim(),
             email: email.trim(),
             companyId: companyId,
+            city: registerResponse.data.city || 'Bangalore',
           };
           await AsyncStorage.setItem('fleetToken', companyId);
           await AsyncStorage.setItem('fleetUser', JSON.stringify(userPayload));
@@ -121,6 +122,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             name: companyName,
             email: email.trim(),
             companyId: companyId,
+            city: loginResponse.data.city || 'Bangalore',
           };
           await AsyncStorage.setItem('fleetToken', companyId);
           await AsyncStorage.setItem('fleetUser', JSON.stringify(userPayload));

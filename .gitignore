@@ -32,6 +32,7 @@ dist/
 build/
 bin/
 obj/
+android/
 
 # Python caching & environments
 __pycache__/

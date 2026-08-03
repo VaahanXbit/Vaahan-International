@@ -29,9 +29,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import authReducer, { setToken, setUser } from './src/store/authSlice';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
-import { DriversScreen } from './src/screens/DriversScreen';
-import { ScoresScreen } from './src/screens/ScoresScreen';
-import { WalletsScreen } from './src/screens/WalletsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { DriverDetailScreen } from './src/screens/DriverDetailScreen';
 import { FeatureDetailScreen } from './src/screens/FeatureDetailScreen';
@@ -79,9 +76,6 @@ const AppStack = () => (
       tabBarIcon: ({ focused, color, size }) => {
         let iconName;
         if (route.name === 'Dashboard') iconName = focused ? 'stats-chart' : 'stats-chart-outline';
-        else if (route.name === 'Drivers') iconName = focused ? 'people' : 'people-outline';
-        else if (route.name === 'Scores') iconName = focused ? 'bar-chart' : 'bar-chart-outline';
-        else if (route.name === 'Wallets') iconName = focused ? 'wallet' : 'wallet-outline';
         else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
@@ -96,9 +90,6 @@ const AppStack = () => (
     })}
   >
     <Tab.Screen name="Dashboard" component={DashboardStack} />
-    <Tab.Screen name="Drivers" component={DriversScreen} />
-    <Tab.Screen name="Scores" component={ScoresScreen} />
-    <Tab.Screen name="Wallets" component={WalletsScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>
 );
