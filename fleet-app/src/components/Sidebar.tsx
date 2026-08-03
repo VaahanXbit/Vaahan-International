@@ -37,15 +37,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
     getDrivers().then(setDrivers);
   }, [visible, driversUpdatedTrigger]);
 
+  const [shouldRender, setShouldRender] = useState(visible);
+
   useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: visible ? 0 : -SIDEBAR_WIDTH,
-      duration: 250,
-      useNativeDriver: true,
-    }).start();
+    if (visible) {
+      setShouldRender(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: -SIDEBAR_WIDTH,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) {
+          setShouldRender(false);
+        }
+      });
+    }
   }, [visible]);
 
-  if (!visible) return null;
+  if (!shouldRender) return null;
 
   return (
     <View style={styles.overlay}>

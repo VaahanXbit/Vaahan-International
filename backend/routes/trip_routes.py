@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/start")
-async def start_trip(driver_id: str = None, vehicle_id: str = None, db: Session = Depends(get_db)):
+async def start_trip(driver_id: str | None = None, vehicle_id: str | None = None, db: Session = Depends(get_db)):
     """Start a new trip"""
     try:
         # Fallback to first driver if none specified or is string 'undefined'/'null'

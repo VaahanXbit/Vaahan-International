@@ -264,7 +264,7 @@ class GPSCoordinate(Base):
     Index on (trip_id, timestamp DESC) for quick replay
     Partial index for recent data (last 30 days)
     """
-    __tablename__ = "gps_points"
+    __tablename__ = "gps_coordinates"
     
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id", ondelete="CASCADE"), nullable=False, index=True)

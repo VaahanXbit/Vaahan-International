@@ -23,7 +23,7 @@ export default function HomeScreen() {
       alert('Location permission is required to start a trip.');
       return;
     }
-    const trip = await startTrip();
+    const trip = await startTrip("default", "default");
     setLoading(false);
     router.push({ pathname: '/active-trip', params: { tripId: trip.tripId } });
   };

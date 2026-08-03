@@ -5,7 +5,12 @@ import { theme } from '../src/theme';
 
 export default function TripSummaryScreen() {
   const { summary } = useLocalSearchParams<{ summary: string }>();
-  const data = JSON.parse(summary || '{}');
+  let data: any = {};
+  try {
+    data = JSON.parse(summary || '{}');
+  } catch (error) {
+    console.error('Failed to parse trip summary:', error);
+  }
 
   return (
     <SafeAreaView style={styles.safeContainer}>

@@ -10,7 +10,31 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL ='http://10.15.251.49:8001/api/v1';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
+const getBaseURL = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Expo Go / Dev server host IP detection
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':')[0];
+    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+      return `http://${ip}:8001/api/v1`;
+    }
+  }
+  
+  // Fallbacks
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8001/api/v1';
+  }
+  return 'http://localhost:8001/api/v1';
+};
+
+const API_BASE_URL = getBaseURL();
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -20,7 +44,10 @@ const client = axios.create({
 // Request interceptor
 client.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('fleetToken');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token) {
+    if (!config.headers) config.headers = {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 
