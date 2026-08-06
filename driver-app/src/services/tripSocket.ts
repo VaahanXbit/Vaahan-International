@@ -18,7 +18,8 @@ const getWebSocketUrl = (tripId: string): string => {
     host = host.replace('10.0.2.2:8000', '10.0.2.2:8001');
   }
   
-  return `ws://${host}/ws/trip/${tripId}`;
+  const protocol = baseURL.startsWith('https') ? 'wss' : 'ws';
+  return `${protocol}://${host}/ws/trip/${tripId}`;
 };
 
 /**

@@ -116,22 +116,31 @@ export default function ActiveTripScreen() {
             setSpeedingCount(speedingCountRef.current);
           }
         }
+      }
+    });
 
-        // Stream telemetry immediately using latest accelerometer reading if available
+    // Stream telemetry on a regular 3-second interval (even if indoors and GPS does not update)
+    const telemetryInterval = setInterval(() => {
+      if (isMounted) {
+        const lat = latestLocationRef.current?.lat ?? 0.0;
+        const lng = latestLocationRef.current?.lng ?? 0.0;
+        const speedKmh = latestLocationRef.current?.speedKmh ?? 0.0;
+
         sendTelemetry({
-          lat: reading.lat,
-          lng: reading.lng,
-          speed_kmh: reading.speedKmh,
+          lat: lat,
+          lng: lng,
+          speed_kmh: speedKmh,
           accel_x: latestAccelRef.current?.x ?? 0.0,
           accel_y: latestAccelRef.current?.y ?? 0.0,
           accel_z: latestAccelRef.current?.z ?? 0.0,
           timestamp: new Date().toISOString(),
         });
       }
-    });
+    }, 3000);
 
     return () => {
       isMounted = false;
+      clearInterval(telemetryInterval);
       stopAccelListening();
       stopLocationTracking();
       disconnectTripSocket();
