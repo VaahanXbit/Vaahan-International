@@ -227,6 +227,7 @@ class Trip(Base):
     speeding_count = Column(Integer, default=0)
     harsh_corner_count = Column(Integer, default=0)
     status = Column(String(50), default="active")  # active, completed, paused
+    final_score = Column(Numeric(5, 2), default=100.0)
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -274,6 +275,9 @@ class GPSCoordinate(Base):
     accuracy = Column(Numeric(5, 2))  # meters
     speed_kmh = Column(Numeric(5, 1))  # km/h
     bearing = Column(Integer)  # degrees (0-360)
+    accel_x = Column(Numeric(9, 6), nullable=True)
+    accel_y = Column(Numeric(9, 6), nullable=True)
+    accel_z = Column(Numeric(9, 6), nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     
     # Relationships

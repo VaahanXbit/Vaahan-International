@@ -15,6 +15,7 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
     await websocket.accept()
     logger.info(f"🔌 WebSocket connected: Trip ID {trip_id}")
     
+    gravity_filter = None
     try:
         while True:
             data = await websocket.receive_json()
@@ -53,6 +54,9 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                     latitude=lat,
                     longitude=lng,
                     speed_kmh=speed_kmh,
+                    accel_x=accel_x,
+                    accel_y=accel_y,
+                    accel_z=accel_z,
                     timestamp=timestamp
                 )
                 session.add(gps)
@@ -60,16 +64,34 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                 # 2. Check and detect harsh driving events
                 detected_events = []
                 
-                # Harsh braking / Acceleration check (accel_y)
-                if abs(accel_y) > 0.8:
-                    event_type = "harsh_brake" if accel_y < -0.8 else "harsh_accel"
-                    severity = min(abs(accel_y), 1.0)
+                # Convert raw database Gs back to m/s² for consistency with our standard low-pass math
+                ax_raw_ms2 = accel_x * 9.81
+                ay_raw_ms2 = accel_y * 9.81
+                az_raw_ms2 = accel_z * 9.81
+
+                if gravity_filter is None:
+                    gravity_filter = [ax_raw_ms2, ay_raw_ms2, az_raw_ms2]
+
+                # Update running average (ALPHA = 0.8)
+                gravity_filter[0] = 0.8 * gravity_filter[0] + 0.2 * ax_raw_ms2
+                gravity_filter[1] = 0.8 * gravity_filter[1] + 0.2 * ay_raw_ms2
+                gravity_filter[2] = 0.8 * gravity_filter[2] + 0.2 * az_raw_ms2
+
+                # Remove gravity and convert back to G
+                lax = (ax_raw_ms2 - gravity_filter[0]) / 9.81
+                lay = (ay_raw_ms2 - gravity_filter[1]) / 9.81
+                laz = (az_raw_ms2 - gravity_filter[2]) / 9.81
+                
+                # Harsh braking / Acceleration check using linear longitudinal force (lay)
+                if abs(lay) > 0.8:
+                    event_type = "harsh_brake" if lay < -0.8 else "harsh_accel"
+                    severity = min(abs(lay), 1.0)
                     detected_events.append((event_type, severity))
                 
-                # Harsh corner check (accel_x)
-                if abs(accel_x) > 0.7:
+                # Harsh corner check using linear lateral force (lax)
+                if abs(lax) > 0.7:
                     event_type = "harsh_corner"
-                    severity = min(abs(accel_x), 1.0)
+                    severity = min(abs(lax), 1.0)
                     detected_events.append((event_type, severity))
                 
                 # Insert detected events into TripEvent table

@@ -2,6 +2,8 @@ import client from '../api/client';
 
 let ws: WebSocket | null = null;
 let serverMessageCallback: ((data: { received: boolean; event_detected: string }) => void) | null = null;
+let activeTripId: string | null = null;
+let reconnectTimer: any = null;
 
 // Resolve the WebSocket URL based on the REST API client baseURL configuration
 const getWebSocketUrl = (tripId: string): string => {
@@ -23,9 +25,15 @@ const getWebSocketUrl = (tripId: string): string => {
  * Open a live WebSocket connection for the active trip
  */
 export function connectTripSocket(tripId: string) {
+  activeTripId = tripId;
   const url = getWebSocketUrl(tripId);
   console.log(`🔌 Connecting to Telemetry WebSocket: ${url}`);
   
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
   try {
     ws = new WebSocket(url);
     
@@ -51,6 +59,16 @@ export function connectTripSocket(tripId: string) {
     
     ws.onclose = (event) => {
       console.log(`Telemetry WebSocket closed (code: ${event.code}, reason: ${event.reason})`);
+      
+      // Auto-reconnect if the connection closed unexpectedly (not disconnected manually)
+      if (activeTripId) {
+        console.log('🔌 Unexpected WebSocket disconnect. Reconnecting in 3 seconds...');
+        reconnectTimer = setTimeout(() => {
+          if (activeTripId) {
+            connectTripSocket(activeTripId);
+          }
+        }, 3000);
+      }
     };
   } catch (error) {
     console.error('Failed to initialize WebSocket connection:', error);
@@ -68,7 +86,7 @@ export function sendTelemetry(reading: {
   accel_y: number;
   accel_z: number;
   timestamp: string;
-}) {
+ }) {
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     console.log('⚠️  Cannot send telemetry. WebSocket connection is not open.');
     return;
@@ -94,6 +112,12 @@ export function onServerMessage(callback: (data: { received: boolean; event_dete
  * Disconnect and clean up the active WebSocket connection
  */
 export function disconnectTripSocket() {
+  activeTripId = null; // Prevent reconnection loops
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  
   if (ws) {
     console.log('🔌 Disconnecting Telemetry WebSocket...');
     try {

@@ -23,12 +23,12 @@ export async function startLocationTracking(onReading: (reading: LocationReading
     return;
   }
   subscription = await Location.watchPositionAsync(
-    { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 5 },
+    { accuracy: Location.Accuracy.High, timeInterval: 3000 },
     (loc) => {
       onReading({
         lat: loc.coords.latitude,
         lng: loc.coords.longitude,
-        speedKmh: Math.max(0, (loc.coords.speed ?? 0) * 3.6), 
+        speedKmh: (loc.coords.speed && loc.coords.speed > 1.0) ? loc.coords.speed * 3.6 : 0,
         ts: new Date(loc.timestamp).toISOString(),
       });
     }

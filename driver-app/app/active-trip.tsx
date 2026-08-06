@@ -27,7 +27,8 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): nu
 export default function ActiveTripScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const [lastReading, setLastReading] = useState<AccelReading | null>(null);
-  const [harshCount, setHarshCount] = useState(0);
+  const [harshBrakesCount, setHarshBrakesCount] = useState(0);
+  const [harshCornersCount, setHarshCornersCount] = useState(0);
   const [speed, setSpeed] = useState<number>(0);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [speedingCount, setSpeedingCount] = useState(0);
@@ -39,7 +40,8 @@ export default function ActiveTripScreen() {
   const tripStartTimeRef = useRef<number>(Date.now());
   
   const speedingCountRef = useRef<number>(0);
-  const harshCountRef = useRef<number>(0);
+  const harshBrakesCountRef = useRef<number>(0);
+  const harshCornersCountRef = useRef<number>(0);
 
   // Cache refs for combining sensors in real-time updates
   const latestLocationRef = useRef<{ lat: number; lng: number; speedKmh: number } | null>(null);
@@ -53,6 +55,15 @@ export default function ActiveTripScreen() {
       connectTripSocket(tripId);
       onServerMessage((res) => {
         console.log(' Telemetry server verification callback:', res);
+        if (res.event_detected) {
+          if (res.event_detected === 'harsh_brake' || res.event_detected === 'harsh_accel') {
+            harshBrakesCountRef.current += 1;
+            setHarshBrakesCount(harshBrakesCountRef.current);
+          } else if (res.event_detected === 'harsh_corner') {
+            harshCornersCountRef.current += 1;
+            setHarshCornersCount(harshCornersCountRef.current);
+          }
+        }
       });
     }
 
@@ -61,12 +72,6 @@ export default function ActiveTripScreen() {
       if (isMounted) {
         setLastReading(reading);
         latestAccelRef.current = reading;
-        
-        const event = isHarshEvent(reading);
-        if (event) {
-          harshCountRef.current += 1;
-          setHarshCount(harshCountRef.current);
-        }
 
         // Stream telemetry immediately using latest location reading if available
         if (latestLocationRef.current) {
@@ -139,11 +144,12 @@ export default function ActiveTripScreen() {
     disconnectTripSocket();
 
     // Local scoring logic
-    const finalScore = Math.max(0, 100 - (harshCountRef.current * 5) - (speedingCountRef.current * 5));
+    const totalHarsh = harshBrakesCountRef.current + harshCornersCountRef.current;
+    const finalScore = Math.max(0, 100 - (totalHarsh * 5) - (speedingCountRef.current * 5));
 
     const summary = await endTrip({
       distanceKm: distanceRef.current,
-      harshEvents: harshCountRef.current,
+      harshEvents: totalHarsh,
       speedingIncidents: speedingCountRef.current,
       finalScore: finalScore,
       durationMin: 0
@@ -192,13 +198,19 @@ export default function ActiveTripScreen() {
           </View>
 
           <View style={styles.statsRow}>
-            <View style={[styles.detailItem, styles.halfWidth]}>
-              <Text style={styles.detailLabel}>HARSH EVENTS</Text>
-              <Text style={[styles.detailValue, harshCount > 0 ? styles.dangerText : null]}>
-                {harshCount}
+            <View style={[styles.detailItem, styles.oneThirdWidth]}>
+              <Text style={styles.detailLabel}>HARSH BRAKES</Text>
+              <Text style={[styles.detailValue, harshBrakesCount > 0 ? styles.dangerText : null]}>
+                {harshBrakesCount}
               </Text>
             </View>
-            <View style={[styles.detailItem, styles.halfWidth]}>
+            <View style={[styles.detailItem, styles.oneThirdWidth]}>
+              <Text style={styles.detailLabel}>HARSH CORNERS</Text>
+              <Text style={[styles.detailValue, harshCornersCount > 0 ? styles.dangerText : null]}>
+                {harshCornersCount}
+              </Text>
+            </View>
+            <View style={[styles.detailItem, styles.oneThirdWidth]}>
               <Text style={styles.detailLabel}>SPEEDING</Text>
               <Text style={[styles.detailValue, speedingCount > 0 ? styles.dangerText : null]}>
                 {speedingCount}
@@ -286,6 +298,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   halfWidth: {
+    flex: 1,
+  },
+  oneThirdWidth: {
     flex: 1,
   },
   dangerText: {

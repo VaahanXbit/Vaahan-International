@@ -89,37 +89,52 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       };
 
   useEffect(() => {
+    let pollInterval: any = null;
+
     getDriverDetail(driverId).then(data => {
       setDriver(data);
       setLoading(false);
 
-      // Fetch active trip coordinates from backend
-      api.listTrips(driverId)
-        .then(res => {
-          if (res.data?.trips?.length > 0) {
-            const activeTrip = res.data.trips.find((t: any) => t.status === 'active');
-            if (activeTrip) {
-              api.getTrip(activeTrip.id)
-                .then(tripRes => {
-                  if (tripRes.data?.gps_points) {
-                    const points = tripRes.data.gps_points.map((p: any) => ({
-                      lat: parseFloat(p.latitude),
-                      lng: parseFloat(p.longitude),
-                      timestamp: p.timestamp,
-                    }));
-                    setGpsPoints(points);
-                  }
-                })
-                .catch(err => console.error('Error fetching active trip details:', err));
+      const fetchActiveTelemetry = () => {
+        api.listTrips(driverId)
+          .then(res => {
+            if (res.data?.trips?.length > 0) {
+              const activeTrip = res.data.trips.find((t: any) => t.status === 'active');
+              if (activeTrip) {
+                api.getTrip(activeTrip.id)
+                  .then(tripRes => {
+                    if (tripRes.data?.gps_points) {
+                      const points = tripRes.data.gps_points.map((p: any) => ({
+                        lat: parseFloat(p.latitude),
+                        lng: parseFloat(p.longitude),
+                        timestamp: p.timestamp,
+                      }));
+                      setGpsPoints(points);
+                    }
+                  })
+                  .catch(err => console.error('Error fetching active trip details:', err));
+              } else {
+                setGpsPoints([]);
+              }
             } else {
               setGpsPoints([]);
             }
-          } else {
-            setGpsPoints([]);
-          }
-        })
-        .catch(err => console.error('Error listing trips for driver:', err));
+          })
+          .catch(err => console.error('Error listing trips for driver:', err));
+      };
+
+      // Initial fetch
+      fetchActiveTelemetry();
+
+      // Poll every 5 seconds for live coordinates update on map
+      pollInterval = setInterval(fetchActiveTelemetry, 5000);
     });
+
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
   }, [driverId, refreshTrigger]);
 
   const handleDeletePress = () => {

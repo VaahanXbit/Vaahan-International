@@ -153,6 +153,15 @@ def init_db():
         from models import Base as ImportedBase
         ImportedBase.metadata.create_all(bind=engine)
         logger.info("  All database tables created successfully")
+        
+        # Run startup migrations to add columns if they don't exist
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE gps_coordinates ADD COLUMN IF NOT EXISTS accel_x NUMERIC(9, 6)"))
+            conn.execute(text("ALTER TABLE gps_coordinates ADD COLUMN IF NOT EXISTS accel_y NUMERIC(9, 6)"))
+            conn.execute(text("ALTER TABLE gps_coordinates ADD COLUMN IF NOT EXISTS accel_z NUMERIC(9, 6)"))
+            conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS final_score NUMERIC(5, 2) DEFAULT 100.0"))
+            conn.commit()
+        logger.info("  Startup migrations for accelerometer columns completed successfully")
     except Exception as e:
         logger.error(f"❌ Failed to initialize database: {str(e)}")
         raise

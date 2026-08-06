@@ -33,8 +33,8 @@ const getBaseURL = () => {
     }
   }
   
-  // High-reliability local network fallback using active interface IP
-  return 'http://192.168.0.189:8001/api/v1';
+  // High-reliability production backend URL hosted on Render
+  return 'https://vaahan-international-1-yro3.onrender.com/api/v1';
 };
 
 const API_BASE_URL = getBaseURL();

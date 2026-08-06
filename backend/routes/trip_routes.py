@@ -15,13 +15,14 @@
 ================================================================================
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, BackgroundTasks
 from sqlalchemy.orm import Session
 from datetime import datetime
 import logging
 
 from database import get_db
 from models import Driver, Trip, GPSCoordinate, TripEvent, Vehicle
+from tasks import calculate_trip_scores_task
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -96,7 +97,7 @@ async def update_gps(trip_id: str, gps_points: list = Body(..., embed=True), db:
         raise HTTPException(status_code=500, detail="Failed to record GPS")
 
 @router.post("/{trip_id}/end")
-async def end_trip(trip_id: str, distance_km: float, duration_minutes: int, db: Session = Depends(get_db)):
+async def end_trip(trip_id: str, distance_km: float, duration_minutes: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """End an active trip"""
     try:
         trip = db.query(Trip).filter(Trip.id == trip_id).first()
@@ -109,6 +110,10 @@ async def end_trip(trip_id: str, distance_km: float, duration_minutes: int, db: 
         trip.status = "completed"
         db.commit()
         logger.info(f"  Trip completed: {trip_id}")
+        
+        # Trigger async scoring calculation task via FastAPI BackgroundTasks
+        background_tasks.add_task(calculate_trip_scores_task, trip_id)
+        
         return {"status": "success"}
     except Exception as e:
         db.rollback()
@@ -127,7 +132,17 @@ async def get_trip(trip_id: str, db: Session = Depends(get_db)):
         
         return {
             "status": "success",
-            "trip": {"id": str(trip.id), "status": trip.status},
+            "trip": {
+                "id": str(trip.id),
+                "status": trip.status,
+                "final_score": float(trip.final_score) if trip.final_score is not None else 100.0,
+                "distance_km": float(trip.distance_km) if trip.distance_km is not None else 0.0,
+                "duration_minutes": trip.duration_minutes or 0,
+                "total_events": trip.total_events or 0,
+                "harsh_brake_count": trip.harsh_brake_count or 0,
+                "speeding_count": trip.speeding_count or 0,
+                "harsh_corner_count": trip.harsh_corner_count or 0,
+            },
             "gps_points": len(gps_points),
             "events": len(events)
         }
