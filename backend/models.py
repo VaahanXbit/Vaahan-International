@@ -71,6 +71,8 @@ class Company(Base):
     plan_type = Column(String(20), default="starter")  # starter, pro, enterprise
     subscription_status = Column(String(50), default="active")  # active, suspended
     total_drivers = Column(Integer, default=0)
+    unique_pin = Column(String(6), unique=True, nullable=True)
+    password = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

@@ -25,7 +25,7 @@ import os
 from datetime import datetime
 
 # Import database setup
-from database import engine, Base, SessionLocal
+from database import engine, Base, SessionLocal, init_db
 
 # Import route modules
 from routes import auth_routes, trip_routes, score_routes, fleet_routes, driver_socket
@@ -60,8 +60,8 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 80)
     
     try:
-        # Create all tables based on SQLAlchemy models
-        Base.metadata.create_all(bind=engine)
+        # Create all tables and run startup column migrations
+        init_db()
         logger.info("Database tables initialized successfully")
         logger.info("CORS middleware configured for mobile apps")
         logger.info("All route handlers registered")
@@ -188,6 +188,7 @@ app.include_router(
 # Driver Telemetry WebSocket Routes
 app.include_router(
     driver_socket.router,
+    prefix="/api/v1/auth",
     tags=["Driver Telemetry"]
 )
 

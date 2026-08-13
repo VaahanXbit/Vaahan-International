@@ -56,20 +56,27 @@ logger.info(f"Database URL: {DATABASE_URL}")
 # ENGINE SETUP WITH CONNECTION POOLING
 # ============================================================================
 
-engine = create_engine(
-    DATABASE_URL,
-    poolclass=None,  # Use default pool (QueuePool)
-    pool_size=20,  # Keep 20 connections in pool
-    max_overflow=10,  # Allow up to 10 additional overflow connections
-    pool_pre_ping=True,  # Test connection before using
-    echo=False,  # Set to True for SQL debugging
-    connect_args={
-        "connect_timeout": 10,
-        "application_name": "fleet_platform_backend",
-    }
-)
-
-logger.info("  SQLAlchemy engine created with connection pooling")
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        echo=False
+    )
+    logger.info("  SQLAlchemy SQLite engine created")
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=None,  # Use default pool (QueuePool)
+        pool_size=20,  # Keep 20 connections in pool
+        max_overflow=10,  # Allow up to 10 additional overflow connections
+        pool_pre_ping=True,  # Test connection before using
+        echo=False,  # Set to True for SQL debugging
+        connect_args={
+            "connect_timeout": 10,
+            "application_name": "fleet_platform_backend",
+        }
+    )
+    logger.info("  SQLAlchemy engine created with connection pooling")
 
 # ============================================================================
 # SESSION FACTORY
@@ -154,12 +161,13 @@ def init_db():
         ImportedBase.metadata.create_all(bind=engine)
         logger.info("  All database tables created successfully")
         
-        # Run startup migrations to add columns if they don't exist
         with engine.connect() as conn:
             conn.execute(text("ALTER TABLE gps_coordinates ADD COLUMN IF NOT EXISTS accel_x NUMERIC(9, 6)"))
             conn.execute(text("ALTER TABLE gps_coordinates ADD COLUMN IF NOT EXISTS accel_y NUMERIC(9, 6)"))
             conn.execute(text("ALTER TABLE gps_coordinates ADD COLUMN IF NOT EXISTS accel_z NUMERIC(9, 6)"))
             conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS final_score NUMERIC(5, 2) DEFAULT 100.0"))
+            conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS unique_pin VARCHAR(6) UNIQUE"))
+            conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS password VARCHAR(255)"))
             conn.commit()
         logger.info("  Startup migrations for accelerometer columns completed successfully")
     except Exception as e:

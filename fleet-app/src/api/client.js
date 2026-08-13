@@ -63,9 +63,12 @@ client.interceptors.response.use(
 );
 
 export const api = {
-  loginCompany: (email) => client.post(`/auth/login-company?email=${encodeURIComponent(email)}`),
-  registerCompany: (name, email, phone, city, gst) => 
-    client.post(`/auth/register-company?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}&city=${encodeURIComponent(city)}&gst_number=${encodeURIComponent(gst)}`),
+  baseURL: API_BASE_URL,
+  loginCompany: (email, password) => client.post(`/auth/login-company?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`),
+  registerCompany: (name, email, phone, city, gst, password) => 
+    client.post(`/auth/register-company?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}&city=${encodeURIComponent(city)}&gst_number=${encodeURIComponent(gst)}&password=${encodeURIComponent(password)}`),
+  updateCompany: (companyId, name, email, phone, gst) => 
+    client.put(`/auth/update-company/${companyId}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}&gst_number=${encodeURIComponent(gst)}`),
   getDashboard: (companyId) => client.get(`/fleet/dashboard?company_id=${companyId}`),
   getDrivers: (companyId) => client.get(`/fleet/drivers?company_id=${companyId}`),
   getVehicles: (companyId) => client.get(`/fleet/vehicles?company_id=${companyId}`),

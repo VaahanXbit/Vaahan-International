@@ -3,17 +3,48 @@ import logging
 from datetime import datetime, timezone
 from database import SessionLocal
 from models import Trip, GPSCoordinate, TripEvent
+from services.geocoding import reverse_geocode
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections = {}  # trip_id -> set of WebSockets
+
+    async def connect(self, trip_id: str, websocket: WebSocket):
+        await websocket.accept()
+        if trip_id not in self.active_connections:
+            self.active_connections[trip_id] = set()
+        self.active_connections[trip_id].add(websocket)
+        logger.info(f"🔌 WebSocket client connected for Trip: {trip_id}. Total: {len(self.active_connections[trip_id])}")
+
+    def disconnect(self, trip_id: str, websocket: WebSocket):
+        if trip_id in self.active_connections:
+            if websocket in self.active_connections[trip_id]:
+                self.active_connections[trip_id].remove(websocket)
+            if not self.active_connections[trip_id]:
+                del self.active_connections[trip_id]
+        logger.info(f"🔌 WebSocket client disconnected for Trip: {trip_id}")
+
+    async def broadcast_to_trip(self, trip_id: str, message: dict, sender: WebSocket):
+        if trip_id in self.active_connections:
+            for connection in list(self.active_connections[trip_id]):
+                if connection != sender:
+                    try:
+                        await connection.send_json(message)
+                    except Exception as e:
+                        # Stale connection, clean up
+                        logger.warning(f"Failed to send broadcast frame: {str(e)}")
+
+manager = ConnectionManager()
 
 @router.websocket("/ws/trip/{trip_id}")
 async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
     """
     WebSocket endpoint for live driver telemetry during an active trip.
     """
-    await websocket.accept()
-    logger.info(f"🔌 WebSocket connected: Trip ID {trip_id}")
+    await manager.connect(trip_id, websocket)
     
     gravity_filter = None
     try:
@@ -68,15 +99,15 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                 ax_raw_ms2 = accel_x * 9.81
                 ay_raw_ms2 = accel_y * 9.81
                 az_raw_ms2 = accel_z * 9.81
-
+ 
                 if gravity_filter is None:
                     gravity_filter = [ax_raw_ms2, ay_raw_ms2, az_raw_ms2]
-
+ 
                 # Update running average (ALPHA = 0.8)
                 gravity_filter[0] = 0.8 * gravity_filter[0] + 0.2 * ax_raw_ms2
                 gravity_filter[1] = 0.8 * gravity_filter[1] + 0.2 * ay_raw_ms2
                 gravity_filter[2] = 0.8 * gravity_filter[2] + 0.2 * az_raw_ms2
-
+ 
                 # Remove gravity and convert back to G
                 lax = (ax_raw_ms2 - gravity_filter[0]) / 9.81
                 lay = (ay_raw_ms2 - gravity_filter[1]) / 9.81
@@ -116,18 +147,54 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                 
                 session.commit()
                 
+                # Reverse geocode coordinates using OpenStreetMap Nominatim
+                location_name = await reverse_geocode(lat, lng, trip_id)
+                
+                # Broadcast payload to listeners (like fleet-app)
+                broadcast_payload = {
+                    "lat": lat,
+                    "lng": lng,
+                    "speed_kmh": speed_kmh,
+                    "accel_x": accel_x,
+                    "accel_y": accel_y,
+                    "accel_z": accel_z,
+                    "timestamp": timestamp.isoformat(),
+                    "event_detected": event_detected,
+                    "location_name": location_name
+                }
+                await manager.broadcast_to_trip(trip_id, broadcast_payload, websocket)
+                
             except Exception as e:
                 session.rollback()
                 logger.error(f"Error saving telemetry to database: {str(e)}")
+                location_name = None
             finally:
                 session.close()
                 
             await websocket.send_json({
                 "received": True,
-                "event_detected": event_detected
+                "event_detected": event_detected,
+                "location_name": location_name
             })
             
     except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected cleanly: Trip ID {trip_id}")
+        manager.disconnect(trip_id, websocket)
     except Exception as e:
         logger.error(f"WebSocket error on Trip ID {trip_id}: {str(e)}")
+        manager.disconnect(trip_id, websocket)
+
+@router.websocket("/ws/trip/{trip_id}/listen")
+async def websocket_trip_listen_endpoint(websocket: WebSocket, trip_id: str):
+    """
+    WebSocket endpoint for listeners (like fleet owners) to stream live telemetry updates.
+    """
+    await manager.connect(trip_id, websocket)
+    try:
+        while True:
+            # We keep the socket alive by waiting for any potential incoming text
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(trip_id, websocket)
+    except Exception as e:
+        logger.error(f"WebSocket listener error on Trip ID {trip_id}: {str(e)}")
+        manager.disconnect(trip_id, websocket)

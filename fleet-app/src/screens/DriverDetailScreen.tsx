@@ -18,7 +18,6 @@ import { TelemetryChart } from '../components/TelemetryChart';
 import { AddDriverModal } from '../components/AddDriverModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
-import MapView, { Marker, Polyline } from 'react-native-maps';
 import { api } from '../api/client';
 
 const CITY_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
@@ -66,6 +65,8 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [gpsPoints, setGpsPoints] = useState<{ lat: number; lng: number; timestamp: string }[]>([]);
+  const [activeTripId, setActiveTripId] = useState<string | null>(null);
+  const [liveSpeed, setLiveSpeed] = useState<number>(0);
 
   const companyCity = useSelector((state: any) => state.auth.user?.city);
   const lowercaseCity = (companyCity || 'bangalore').trim().toLowerCase();
@@ -101,6 +102,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             if (res.data?.trips?.length > 0) {
               const activeTrip = res.data.trips.find((t: any) => t.status === 'active');
               if (activeTrip) {
+                setActiveTripId(activeTrip.id);
                 api.getTrip(activeTrip.id)
                   .then(tripRes => {
                     if (tripRes.data?.gps_points) {
@@ -114,9 +116,11 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   })
                   .catch(err => console.error('Error fetching active trip details:', err));
               } else {
+                setActiveTripId(null);
                 setGpsPoints([]);
               }
             } else {
+              setActiveTripId(null);
               setGpsPoints([]);
             }
           })
@@ -136,6 +140,52 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       }
     };
   }, [driverId, refreshTrigger]);
+
+  useEffect(() => {
+    if (!activeTripId) {
+      setLiveSpeed(0);
+      return;
+    }
+
+    const wsBaseUrl = api.baseURL ? api.baseURL.replace('http://', 'ws://').replace('https://', 'wss://') : 'ws://127.0.0.1:8001/api/v1';
+    const wsUrl = `${wsBaseUrl}/auth/ws/trip/${activeTripId}/listen`;
+
+    console.log('Connecting to fleet live tracking WS:', wsUrl);
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('Connected to fleet live tracking WS!');
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.lat && data.lng) {
+          setGpsPoints(prev => {
+            if (prev.some(p => p.timestamp === data.timestamp)) return prev;
+            return [...prev, { lat: data.lat, lng: data.lng, timestamp: data.timestamp }];
+          });
+        }
+        if (data.speed_kmh !== undefined) {
+          setLiveSpeed(data.speed_kmh);
+        }
+      } catch (err) {
+        console.error('Error parsing live WS payload:', err);
+      }
+    };
+
+    ws.onerror = (e) => {
+      console.error('WS Error:', e);
+    };
+
+    ws.onclose = () => {
+      console.log('WS Connection closed');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [activeTripId]);
 
   const handleDeletePress = () => {
     Alert.alert(
@@ -218,40 +268,26 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               style={styles.tripsContainer}
             >
               <View style={styles.mapWrapper}>
-                <MapView
-                  style={styles.map}
-                  initialRegion={initialRegion}
-                  customMapStyle={darkMapStyle}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
-                  pitchEnabled={false}
-                  rotateEnabled={false}
-                >
-                  {hasGpsData && (
-                    <>
-                      <Polyline
-                        coordinates={gpsPoints.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-                        strokeColor={theme.colors.primary}
-                        strokeWidth={3}
-                      />
-                      <Marker
-                        coordinate={{
-                          latitude: gpsPoints[gpsPoints.length - 1].lat,
-                          longitude: gpsPoints[gpsPoints.length - 1].lng,
-                        }}
-                        anchor={{ x: 0.5, y: 0.5 }}
-                      >
-                        <View style={styles.truckMarker}>
-                          <MaterialIcons name="local-shipping" size={14} color="#000" />
-                        </View>
-                      </Marker>
-                    </>
+                <View style={styles.webMapFallback}>
+                  <MaterialIcons name="map" size={32} color={theme.colors.brandTeal} style={{ marginBottom: 8 }} />
+                  <Text style={[theme.typography.bodyMd, { color: '#ffffff', fontWeight: '600', textAlign: 'center' }]}>
+                    Interactive Map view is active on Android/iOS
+                  </Text>
+                  {hasGpsData ? (
+                    <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant, marginTop: 4, fontSize: 10 }]}>
+                      GPS: {gpsPoints[gpsPoints.length - 1].lat.toFixed(5)}, {gpsPoints[gpsPoints.length - 1].lng.toFixed(5)}
+                    </Text>
+                  ) : (
+                    <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant, marginTop: 4, fontSize: 10 }]}>
+                      Waiting for GPS signals...
+                    </Text>
                   )}
-                </MapView>
-                {!hasGpsData && (
-                  <View style={styles.emptyOverlay}>
-                    <MaterialIcons name="map" size={24} color={theme.colors.onSurfaceVariant} />
-                    <Text style={styles.emptyText}>No trip data recorded yet</Text>
+                </View>
+
+                {activeTripId !== null && (
+                  <View style={styles.liveOverlayBadge}>
+                    <View style={styles.liveIndicatorDot} />
+                    <Text style={styles.liveBadgeText}>LIVE: {liveSpeed.toFixed(0)} km/h</Text>
                   </View>
                 )}
               </View>
@@ -589,6 +625,36 @@ const styles = StyleSheet.create({
     borderColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  liveOverlayBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+  liveIndicatorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10b981',
+  },
+  liveBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  webMapFallback: {
+    flex: 1,
+    backgroundColor: '#0f0f12',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
   },
 });
 export default DriverDetailScreen;

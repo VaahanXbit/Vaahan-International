@@ -10,13 +10,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import theme from '../theme';
-import { getDrivers, Driver } from '../data/mockFleetData';
+import { api } from '../api/client';
+import { useSelector } from 'react-redux';
 
 interface SidebarProps {
   visible: boolean;
   onClose: () => void;
   onSelectDriver: (driverId: string) => void;
-  onOpenAddDriver: () => void;
   driversUpdatedTrigger?: number; // Counter to force re-fetch
 }
 
@@ -27,17 +27,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
   visible,
   onClose,
   onSelectDriver,
-  onOpenAddDriver,
   driversUpdatedTrigger = 0,
 }) => {
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const companyId = useSelector((state: any) => state.auth.user?.companyId);
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+  const [shouldRender, setShouldRender] = useState(visible);
 
   useEffect(() => {
-    getDrivers().then(setDrivers);
-  }, [visible, driversUpdatedTrigger]);
-
-  const [shouldRender, setShouldRender] = useState(visible);
+    if (visible && companyId) {
+      api.getDrivers(companyId)
+        .then(response => {
+          if (response.data && Array.isArray(response.data.drivers)) {
+            setDrivers(response.data.drivers);
+          } else {
+            setDrivers([]);
+          }
+        })
+        .catch(err => {
+          console.error("Failed to fetch fleet drivers from API:", err);
+          setDrivers([]);
+        });
+    }
+  }, [visible, companyId, driversUpdatedTrigger]);
 
   useEffect(() => {
     if (visible) {
@@ -83,58 +95,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </View>
 
           <ScrollView style={styles.scrollList} contentContainerStyle={styles.listContent}>
-            {drivers.map(driver => {
-              const statusStyle =
-                driver.status === 'Active'
-                  ? { bg: 'rgba(155, 208, 213, 0.1)', border: '#9bd0d5', text: '#9bd0d5' }
-                  : driver.status === 'Idle'
-                  ? { bg: 'rgba(217, 119, 6, 0.1)', border: '#d97706', text: '#d97706' }
-                  : { bg: 'rgba(108, 119, 120, 0.1)', border: '#6c7778', text: '#dce8e8' };
+            {drivers.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No drivers currently under this fleet</Text>
+              </View>
+            ) : (
+              drivers.map(driver => {
+                const statusStyle =
+                  driver.status === 'Active'
+                    ? { bg: 'rgba(155, 208, 213, 0.1)', border: '#9bd0d5', text: '#9bd0d5' }
+                    : driver.status === 'Idle'
+                    ? { bg: 'rgba(217, 119, 6, 0.1)', border: '#d97706', text: '#d97706' }
+                    : { bg: 'rgba(108, 119, 120, 0.1)', border: '#6c7778', text: '#dce8e8' };
 
-              return (
-                <TouchableOpacity
-                  key={driver.id}
-                  style={styles.driverRow}
-                  onPress={() => {
-                    onSelectDriver(driver.id);
-                    onClose();
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.avatar}>
-                    <Text style={[theme.typography.labelCaps, { color: theme.colors.onPrimary }]}>
-                      {driver.name.charAt(0)}
-                    </Text>
-                  </View>
-                  <View style={styles.driverInfo}>
-                    <Text style={[theme.typography.bodyLg, { color: theme.colors.onSurface, fontWeight: '600' }]}>
-                      {driver.name}
-                    </Text>
-                    <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant, fontSize: 10, marginTop: 2 }]}>
-                      {driver.vehicleName}
-                    </Text>
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg, borderColor: statusStyle.border }]}>
-                    <Text style={[styles.statusBadgeText, { color: statusStyle.text }]}>
-                      {driver.status.toUpperCase()}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                return (
+                  <TouchableOpacity
+                    key={driver.id}
+                    style={styles.driverRow}
+                    onPress={() => {
+                      onSelectDriver(driver.id);
+                      onClose();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.avatar}>
+                      <Text style={[theme.typography.labelCaps, { color: theme.colors.onPrimary }]}>
+                        {driver.name ? driver.name.charAt(0) : 'D'}
+                      </Text>
+                    </View>
+                    <View style={styles.driverInfo}>
+                      <Text style={[theme.typography.bodyLg, { color: theme.colors.onSurface, fontWeight: '600' }]}>
+                        {driver.name}
+                      </Text>
+                      <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant, fontSize: 10, marginTop: 2, textTransform: 'none' }]}>
+                        {driver.phone || 'No phone'}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg, borderColor: statusStyle.border }]}>
+                      <Text style={[styles.statusBadgeText, { color: statusStyle.text }]}>
+                        {(driver.status || 'Active').toUpperCase()}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </ScrollView>
-
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={onOpenAddDriver}
-              activeOpacity={0.8}
-            >
-              <Text style={[theme.typography.labelCaps, { color: theme.colors.onPrimary, fontSize: 12 }]}>
-                + Add New Driver
-              </Text>
-            </TouchableOpacity>
-          </View>
         </SafeAreaView>
       </Animated.View>
     </View>
@@ -214,16 +220,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  footer: {
-    padding: theme.spacing.gutter,
-    borderTopWidth: 1,
-    borderColor: theme.colors.outlineVariant,
-  },
-  addButton: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.rounded.DEFAULT,
-    paddingVertical: theme.spacing.unit * 3,
+  emptyContainer: {
+    paddingVertical: 40,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    ...theme.typography.bodyMd,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
   },
 });
+
 export default Sidebar;

@@ -42,7 +42,14 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [focusedInput, setFocusedInput] = useState<'name' | 'email' | 'password' | null>(null);
+  const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
+  const [gstNumber, setGstNumber] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [registeredPin, setRegisteredPin] = useState<string | null>(null);
+  const [pendingUserPayload, setPendingUserPayload] = useState<any>(null);
+  const [pendingCompanyId, setPendingCompanyId] = useState<string | null>(null);
 
   // Carousel state and references
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -81,39 +88,59 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   // Replace with real authentication call
   const handleAuthSubmit = async () => {
-    if (!email.trim()) return;
-    if (isSignUp && !name.trim()) return;
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Validation Error', 'Email and Password are required.');
+      return;
+    }
+
+    if (isSignUp) {
+      if (!name.trim() || !phone.trim() || !city.trim() || !gstNumber.trim() || !confirmPassword.trim()) {
+        Alert.alert('Validation Error', 'All fields are required for sign up.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        Alert.alert('Validation Error', 'Passwords do not match.');
+        return;
+      }
+      if (password.length < 6) {
+        Alert.alert('Validation Error', 'Password must be at least 6 characters.');
+        return;
+      }
+    }
 
     try {
       if (isSignUp) {
-        // Register new company - generate a random mock GST number to satisfy constraints
-        const mockGst = '29' + Math.random().toString(36).substring(2, 9).toUpperCase() + '1Z5';
         const registerResponse = await api.registerCompany(
           name.trim(),
           email.trim(),
-          '9876543210',
-          'Bangalore',
-          mockGst
+          phone.trim(),
+          city.trim(),
+          gstNumber.trim(),
+          password
         );
 
         if (registerResponse.data?.status === 'success') {
           const companyId = registerResponse.data.company_id;
+          const uniquePin = registerResponse.data.unique_pin || '000000';
           const userPayload = {
             name: name.trim(),
             email: email.trim(),
             companyId: companyId,
-            city: registerResponse.data.city || 'Bangalore',
+            city: city.trim(),
+            phone: phone.trim(),
+            gstNumber: gstNumber.trim(),
+            uniquePin: uniquePin
           };
-          await AsyncStorage.setItem('fleetToken', companyId);
-          await AsyncStorage.setItem('fleetUser', JSON.stringify(userPayload));
-          dispatch(setToken(companyId));
-          dispatch(setUser(userPayload));
+          
+          setPendingCompanyId(companyId);
+          setPendingUserPayload(userPayload);
+          setRegisteredPin(uniquePin);
         } else {
           Alert.alert('Registration Failed', 'Could not register company.');
         }
       } else {
-        // Log in existing company using email stopgap endpoint
-        const loginResponse = await api.loginCompany(email.trim());
+        // Log in existing company using email and password
+        const loginResponse = await api.loginCompany(email.trim(), password);
 
         if (loginResponse.data?.status === 'success') {
           const companyId = loginResponse.data.company_id;
@@ -122,7 +149,10 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             name: companyName,
             email: email.trim(),
             companyId: companyId,
-            city: loginResponse.data.city || 'Bangalore',
+            city: loginResponse.data.city || '',
+            phone: loginResponse.data.phone || '',
+            gstNumber: loginResponse.data.gst_number || '',
+            uniquePin: loginResponse.data.unique_pin || ''
           };
           await AsyncStorage.setItem('fleetToken', companyId);
           await AsyncStorage.setItem('fleetUser', JSON.stringify(userPayload));
@@ -134,6 +164,20 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       console.error('Error during local auth submit:', e);
       const errorMsg = e.response?.data?.detail || 'An error occurred during authentication.';
       Alert.alert('Authentication Error', errorMsg);
+    }
+  };
+
+  const handleProceedToDashboard = async () => {
+    if (!pendingCompanyId || !pendingUserPayload) return;
+    try {
+      await AsyncStorage.setItem('fleetToken', pendingCompanyId);
+      await AsyncStorage.setItem('fleetUser', JSON.stringify(pendingUserPayload));
+      dispatch(setToken(pendingCompanyId));
+      dispatch(setUser(pendingUserPayload));
+      setRegisteredPin(null);
+    } catch (e) {
+      console.error('Failed to commit auth payload:', e);
+      Alert.alert('Storage Error', 'Could not complete registration.');
     }
   };
 
@@ -201,7 +245,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.form}>
             {isSignUp && (
               <View style={styles.inputGroup}>
-                <Text style={[theme.typography.labelCaps, styles.label]}>Name</Text>
+                <Text style={[theme.typography.labelCaps, styles.label]}>
+                  Fleet Name <Text style={{ color: theme.colors.error }}>*</Text>
+                </Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -211,7 +257,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                   onChangeText={setName}
                   onFocus={() => setFocusedInput('name')}
                   onBlur={() => setFocusedInput(null)}
-                  placeholder="John Doe"
+                  placeholder="e.g. Gati Cargo Express"
                   placeholderTextColor={theme.colors.onSurfaceVariant}
                   autoCapitalize="words"
                 />
@@ -219,7 +265,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={[theme.typography.labelCaps, styles.label]}>Email</Text>
+              <Text style={[theme.typography.labelCaps, styles.label]}>
+                Email <Text style={{ color: theme.colors.error }}>*</Text>
+              </Text>
               <TextInput
                 style={[
                   styles.input,
@@ -236,8 +284,71 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               />
             </View>
 
+            {isSignUp && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={[theme.typography.labelCaps, styles.label]}>
+                    Phone Number <Text style={{ color: theme.colors.error }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      focusedInput === 'phone' && styles.inputFocused
+                    ]}
+                    value={phone}
+                    onChangeText={setPhone}
+                    onFocus={() => setFocusedInput('phone')}
+                    onBlur={() => setFocusedInput(null)}
+                    placeholder="9876543210"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[theme.typography.labelCaps, styles.label]}>
+                    City <Text style={{ color: theme.colors.error }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      focusedInput === 'city' && styles.inputFocused
+                    ]}
+                    value={city}
+                    onChangeText={setCity}
+                    onFocus={() => setFocusedInput('city')}
+                    onBlur={() => setFocusedInput(null)}
+                    placeholder="Bangalore"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={[theme.typography.labelCaps, styles.label]}>
+                    GST Number <Text style={{ color: theme.colors.error }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      focusedInput === 'gstNumber' && styles.inputFocused
+                    ]}
+                    value={gstNumber}
+                    onChangeText={setGstNumber}
+                    onFocus={() => setFocusedInput('gstNumber')}
+                    onBlur={() => setFocusedInput(null)}
+                    placeholder="29ABCDE1234F1Z5"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                    autoCapitalize="characters"
+                  />
+                </View>
+              </>
+            )}
+
             <View style={styles.inputGroup}>
-              <Text style={[theme.typography.labelCaps, styles.label]}>Password</Text>
+              <Text style={[theme.typography.labelCaps, styles.label]}>
+                {isSignUp ? 'Create Password' : 'Password'} <Text style={{ color: theme.colors.error }}>*</Text>
+              </Text>
               <TextInput
                 style={[
                   styles.input,
@@ -254,6 +365,28 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               />
             </View>
 
+            {isSignUp && (
+              <View style={styles.inputGroup}>
+                <Text style={[theme.typography.labelCaps, styles.label]}>
+                  Confirm Password <Text style={{ color: theme.colors.error }}>*</Text>
+                </Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    focusedInput === 'confirmPassword' && styles.inputFocused
+                  ]}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  onFocus={() => setFocusedInput('confirmPassword')}
+                  onBlur={() => setFocusedInput(null)}
+                  placeholder="••••••••"
+                  placeholderTextColor={theme.colors.onSurfaceVariant}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+            )}
+
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={handleAuthSubmit}
@@ -261,22 +394,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             >
               <Text style={[theme.typography.labelCaps, { color: theme.colors.onPrimary, fontSize: 13 }]}>
                 {isSignUp ? 'SIGN UP' : 'LOG IN'}
-              </Text>
-            </TouchableOpacity>
-
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={[theme.typography.labelCaps, styles.dividerText]}>OR</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity
-              style={styles.googleButton}
-              onPress={handleGoogleSignIn}
-              activeOpacity={0.8}
-            >
-              <Text style={[theme.typography.labelCaps, { color: '#000000', fontSize: 12 }]}>
-                SIGN IN WITH GOOGLE
               </Text>
             </TouchableOpacity>
 
@@ -292,6 +409,31 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Registration Success and PIN Display Overlay */}
+      {registeredPin !== null && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconContainer}>
+              <MaterialIcons name="vpn-key" size={32} color={theme.colors.brandTeal} />
+            </View>
+            <Text style={styles.modalTitle}>Registration Successful!</Text>
+            <Text style={styles.modalSubtitle}>
+              Your fleet is now registered. Share this unique PIN with your drivers so they can connect their accounts to your company:
+            </Text>
+            <View style={styles.pinContainer}>
+              <Text style={styles.pinText}>{registeredPin}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={handleProceedToDashboard}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalButtonText}>PROCEED TO DASHBOARD</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -436,6 +578,87 @@ const styles = StyleSheet.create({
   },
   toggleStateText: {
     color: theme.colors.primary,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: theme.colors.surfaceContainer,
+    borderRadius: theme.rounded.lg,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.outlineVariant,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.rounded.md,
+    backgroundColor: theme.colors.surfaceContainerLow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    ...theme.typography.bodyMd,
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.onSurface,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modalSubtitle: {
+    ...theme.typography.bodyMd,
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  pinContainer: {
+    backgroundColor: theme.colors.surfaceContainerLow,
+    borderRadius: theme.rounded.DEFAULT,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    marginBottom: 28,
+    borderWidth: 1,
+    borderColor: theme.colors.outlineVariant,
+  },
+  pinText: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: theme.colors.primary,
+    letterSpacing: 4,
+    textAlign: 'center',
+  },
+  modalButton: {
+    backgroundColor: theme.colors.brandTeal,
+    borderRadius: theme.rounded.DEFAULT,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    width: '100%',
+  },
+  modalButtonText: {
+    ...theme.typography.labelCaps,
+    color: theme.colors.onPrimary,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 export default LoginScreen;

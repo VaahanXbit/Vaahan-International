@@ -14,7 +14,6 @@ import { RootStackParamList } from '../navigation/types';
 import theme from '../theme';
 import { getDashboardData, DashboardData } from '../data/mockFleetData';
 import { Sidebar } from '../components/Sidebar';
-import { AddDriverModal } from '../components/AddDriverModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,7 +26,6 @@ export const DashboardScreen: React.FC<Props> = ({ navigation }) => {
   const dispatch = useDispatch();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [addModalOpen, setAddModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const companyId = useSelector((state: any) => state.auth.user?.companyId);
@@ -125,54 +123,6 @@ export const DashboardScreen: React.FC<Props> = ({ navigation }) => {
             +12% vs last month
           </Text>
         </View>
-
-        {/* Recent Activity Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={[theme.typography.labelCaps, styles.sectionTitle]}>RECENT ACTIVITY</Text>
-        </View>
-
-        <View style={styles.activityFeed}>
-          {dashboardData?.activities.map(act => {
-            let iconName = 'info-outline';
-            let iconColor: string = theme.colors.primary;
-
-            if (act.type === 'error') {
-              iconName = 'error-outline';
-              iconColor = theme.colors.error;
-            } else if (act.type === 'warning') {
-              iconName = 'warning-amber';
-              iconColor = '#d97706';
-            } else if (act.type === 'location') {
-              iconName = 'place';
-              iconColor = theme.colors.primary;
-            } else if (act.type === 'maintenance') {
-              iconName = 'build';
-              iconColor = theme.colors.primary;
-            } else if (act.type === 'assignment') {
-              iconName = 'person';
-              iconColor = theme.colors.primary;
-            } else if (act.type === 'toll') {
-              iconName = 'local-atm';
-              iconColor = theme.colors.primary;
-            }
-
-            return (
-              <View key={act.id} style={styles.activityItem}>
-                <View style={[styles.activityIconBox, { backgroundColor: theme.colors.surfaceContainerLow }]}>
-                  <MaterialIcons name={iconName as any} size={20} color={iconColor} />
-                </View>
-                <View style={styles.activityInfo}>
-                  <Text style={[theme.typography.bodyMd, { color: theme.colors.onSurface }]}>
-                    {act.message}
-                  </Text>
-                  <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant, fontSize: 10, marginTop: 4 }]}>
-                    {act.timestamp}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
       </ScrollView>
 
       {/* Slide-out Sidebar Drawer */}
@@ -180,15 +130,7 @@ export const DashboardScreen: React.FC<Props> = ({ navigation }) => {
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onSelectDriver={handleSelectDriver}
-        onOpenAddDriver={() => setAddModalOpen(true)}
         driversUpdatedTrigger={refreshTrigger}
-      />
-
-      {/* Add New Driver Modal Form */}
-      <AddDriverModal
-        visible={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        onDriverAdded={() => setRefreshTrigger(prev => prev + 1)}
       />
     </SafeAreaView>
   );
