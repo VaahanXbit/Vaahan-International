@@ -102,17 +102,30 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
       return;
     }
 
-    const wsBaseUrl = api.defaults.baseURL 
-      ? api.defaults.baseURL.replace('http://', 'ws://').replace('https://', 'wss://') 
+    const wsBaseUrl = api.baseURL 
+      ? api.baseURL.replace('http://', 'ws://').replace('https://', 'wss://') 
       : 'ws://127.0.0.1:8001/api/v1';
     const wsUrl = `${wsBaseUrl}/auth/ws/trip/${activeTripId}/listen`;
 
     console.log('Connecting Live Tracking WS:', wsUrl);
     const ws = new WebSocket(wsUrl);
 
+    ws.onopen = () => {
+      console.log('Live Tracking WS Connected successfully!');
+    };
+
+    ws.onerror = (err) => {
+      console.error('Live Tracking WS Error:', err);
+    };
+
+    ws.onclose = (event) => {
+      console.log('Live Tracking WS Closed:', event.code, event.reason);
+    };
+
     ws.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
+        console.log('Live Tracking WS Message Received:', data);
         if (data.lat && data.lng) {
           setGpsPoints(prev => {
             if (prev.some(p => p.timestamp === data.timestamp)) return prev;
