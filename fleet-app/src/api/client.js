@@ -13,7 +13,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+// Set to true to target the local backend, or false to target the production Render backend
+const IS_LOCAL_TESTING = false;
+
 const getBaseURL = () => {
+  if (!IS_LOCAL_TESTING) {
+    return 'https://vaahan-international-1-yro3.onrender.com/api/v1';
+  }
+
   if (process.env.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
