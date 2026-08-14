@@ -86,53 +86,68 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
       : 'ws://127.0.0.1:8001/api/v1';
     const wsUrl = `${wsBaseUrl}/auth/ws/trip/${activeTripId}/listen`;
 
-    console.log('Connecting Live Tracking WS (Web):', wsUrl);
-    const ws = new WebSocket(wsUrl);
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: any = null;
+    let isClosedIntentional = false;
 
-    ws.onopen = () => {
-      console.log('Live Tracking WS (Web) Connected successfully!');
-    };
+    const connect = () => {
+      if (isClosedIntentional) return;
+      console.log('Connecting Live Tracking WS (Web):', wsUrl);
+      ws = new WebSocket(wsUrl);
 
-    ws.onerror = (err) => {
-      console.error('Live Tracking WS (Web) Error:', err);
-    };
+      ws.onopen = () => {
+        console.log('Live Tracking WS (Web) Connected successfully!');
+      };
 
-    ws.onclose = (event) => {
-      console.log('Live Tracking WS (Web) Closed:', event.code, event.reason);
-    };
+      ws.onerror = (err) => {
+        console.error('Live Tracking WS (Web) Error:', err);
+      };
 
-    ws.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        console.log('Live Tracking WS (Web) Message Received:', data);
-        if (data.lat && data.lng) {
-          setGpsPoints(prev => {
-            if (prev.some(p => p.timestamp === data.timestamp)) return prev;
-            return [...prev, { lat: data.lat, lng: data.lng, timestamp: data.timestamp }];
-          });
+      ws.onclose = (event) => {
+        console.log('Live Tracking WS (Web) Closed:', event.code, event.reason);
+        if (!isClosedIntentional) {
+          console.log('WS (Web) connection dropped. Reconnecting in 3s...');
+          reconnectTimeout = setTimeout(connect, 3000);
         }
-        if (data.speed_kmh !== undefined) {
-          setLiveSpeed(data.speed_kmh);
-        }
-        if (data.location_name) {
-          setLiveLocation(data.location_name);
-        }
-        if (data.event_detected) {
-          if (data.event_detected === 'harsh_brake') {
-            setLiveHarshBrakes(prev => prev + 1);
-          } else if (data.event_detected === 'harsh_corner') {
-            setLiveHarshCorners(prev => prev + 1);
-          } else if (data.event_detected === 'speeding') {
-            setLiveSpeeding(prev => prev + 1);
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          console.log('Live Tracking WS (Web) Message Received:', data);
+          if (data.lat && data.lng) {
+            setGpsPoints(prev => {
+              if (prev.some(p => p.timestamp === data.timestamp)) return prev;
+              return [...prev, { lat: data.lat, lng: data.lng, timestamp: data.timestamp }];
+            });
           }
+          if (data.speed_kmh !== undefined) {
+            setLiveSpeed(data.speed_kmh);
+          }
+          if (data.location_name) {
+            setLiveLocation(data.location_name);
+          }
+          if (data.event_detected) {
+            if (data.event_detected === 'harsh_brake') {
+              setLiveHarshBrakes(prev => prev + 1);
+            } else if (data.event_detected === 'harsh_corner') {
+              setLiveHarshCorners(prev => prev + 1);
+            } else if (data.event_detected === 'speeding') {
+              setLiveSpeeding(prev => prev + 1);
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing live WS payload:', err);
         }
-      } catch (err) {
-        console.error('Error parsing live WS payload:', err);
-      }
+      };
     };
+
+    connect();
 
     return () => {
-      ws.close();
+      isClosedIntentional = true;
+      if (ws) ws.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
   }, [activeTripId]);
 
