@@ -23,6 +23,7 @@ import logging
 from database import get_db
 from models import Driver, Trip, GPSCoordinate, TripEvent, Vehicle
 from tasks import calculate_trip_scores_task
+from services.geocoding import trip_geocode_state
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -130,6 +131,13 @@ async def get_trip(trip_id: str, db: Session = Depends(get_db)):
         gps_points = db.query(GPSCoordinate).filter(GPSCoordinate.trip_id == trip_id).all()
         events = db.query(TripEvent).filter(TripEvent.trip_id == trip_id).all()
         
+        # Get last geocoded location name from cache
+        state = trip_geocode_state.get(trip_id)
+        current_location = state["last_name"] if (state and state.get("last_name")) else None
+        if not current_location and gps_points:
+            last_pt = gps_points[-1]
+            current_location = f"{float(last_pt.latitude):.5f}, {float(last_pt.longitude):.5f}"
+            
         return {
             "status": "success",
             "trip": {
@@ -142,6 +150,7 @@ async def get_trip(trip_id: str, db: Session = Depends(get_db)):
                 "harsh_brake_count": trip.harsh_brake_count or 0,
                 "speeding_count": trip.speeding_count or 0,
                 "harsh_corner_count": trip.harsh_corner_count or 0,
+                "current_location": current_location,
             },
             "gps_points": [
                 {

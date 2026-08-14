@@ -69,6 +69,9 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
                     setLiveHarshBrakes(tripRes.data.trip.harsh_brake_count || 0);
                     setLiveHarshCorners(tripRes.data.trip.harsh_corner_count || 0);
                     setLiveSpeeding(tripRes.data.trip.speeding_count || 0);
+                    if (tripRes.data.trip.current_location) {
+                      setLiveLocation(tripRes.data.trip.current_location);
+                    }
                   }
                 })
                 .catch(err => console.error('Error fetching active trip details:', err));
