@@ -143,8 +143,24 @@ async def get_trip(trip_id: str, db: Session = Depends(get_db)):
                 "speeding_count": trip.speeding_count or 0,
                 "harsh_corner_count": trip.harsh_corner_count or 0,
             },
-            "gps_points": len(gps_points),
-            "events": len(events)
+            "gps_points": [
+                {
+                    "latitude": float(p.latitude),
+                    "longitude": float(p.longitude),
+                    "timestamp": p.timestamp.isoformat() if p.timestamp else None
+                }
+                for p in gps_points
+            ],
+            "events": [
+                {
+                    "event_type": e.event_type,
+                    "severity": float(e.severity) if e.severity else 0.0,
+                    "latitude": float(e.latitude) if e.latitude else 0.0,
+                    "longitude": float(e.longitude) if e.longitude else 0.0,
+                    "created_at": e.created_at.isoformat() if e.created_at else None
+                }
+                for e in events
+            ]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to get trip")
