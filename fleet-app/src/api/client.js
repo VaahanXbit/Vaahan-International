@@ -17,6 +17,11 @@ const getBaseURL = () => {
   if (process.env.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
+
+  // Prioritize Android emulator loopback to bypass local firewall and LAN routing issues
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8001/api/v1';
+  }
   
   // Expo Go / Dev server host IP detection
   const hostUri = Constants.expoConfig?.hostUri;
@@ -27,10 +32,6 @@ const getBaseURL = () => {
     }
   }
   
-  // Fallbacks
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:8001/api/v1';
-  }
   return 'http://localhost:8001/api/v1';
 };
 
