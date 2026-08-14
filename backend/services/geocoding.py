@@ -99,4 +99,4 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
     # Return previous cached location on any failure/timeout
     if state and state["last_name"]:
         return state["last_name"]
-    return None
+    return f"{lat:.5f}, {lng:.5f}"

@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from database import SessionLocal
 from models import Trip, GPSCoordinate, TripEvent
-from services.geocoding import reverse_geocode
+from services.geocoding import reverse_geocode, trip_geocode_state
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -38,6 +38,39 @@ class ConnectionManager:
                         logger.warning(f"Failed to send broadcast frame: {str(e)}")
 
 manager = ConnectionManager()
+
+async def background_geocode_task(lat: float, lng: float, trip_id: str, websocket: WebSocket, manager: ConnectionManager):
+    """
+    Asynchronously queries Nominatim in the background to prevent telemetry connection blocking.
+    """
+    try:
+        location_name = await reverse_geocode(lat, lng, trip_id)
+        if location_name:
+            # 1. Update the driver app (ack format)
+            try:
+                await websocket.send_json({
+                    "received": True,
+                    "event_detected": "",
+                    "location_name": location_name
+                })
+            except Exception:
+                pass
+            
+            # 2. Update the fleet app listener (broadcast format)
+            broadcast_payload = {
+                "lat": lat,
+                "lng": lng,
+                "speed_kmh": 0.0,
+                "accel_x": 0.0,
+                "accel_y": 0.0,
+                "accel_z": 0.0,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "event_detected": "",
+                "location_name": location_name
+            }
+            await manager.broadcast_to_trip(trip_id, broadcast_payload, websocket)
+    except Exception as e:
+        logger.error(f"Error in background geocoding task: {str(e)}")
 
 @router.websocket("/ws/trip/{trip_id}")
 async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
@@ -147,8 +180,9 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                 
                 session.commit()
                 
-                # Reverse geocode coordinates using OpenStreetMap Nominatim
-                location_name = await reverse_geocode(lat, lng, trip_id)
+                # Get location name (either from in-memory cache or format current lat/lng)
+                state = trip_geocode_state.get(trip_id)
+                location_name = state["last_name"] if (state and state.get("last_name")) else f"{lat:.5f}, {lng:.5f}"
                 
                 # Broadcast payload to listeners (like fleet-app)
                 broadcast_payload = {
@@ -167,7 +201,8 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
             except Exception as e:
                 session.rollback()
                 logger.error(f"Error saving telemetry to database: {str(e)}")
-                location_name = None
+                state = trip_geocode_state.get(trip_id)
+                location_name = state["last_name"] if (state and state.get("last_name")) else f"{lat:.5f}, {lng:.5f}"
             finally:
                 session.close()
                 
@@ -176,6 +211,10 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                 "event_detected": event_detected,
                 "location_name": location_name
             })
+            
+            # Launch geocode update task asynchronously in the background (non-blocking)
+            import asyncio
+            asyncio.create_task(background_geocode_task(lat, lng, trip_id, websocket, manager))
             
     except WebSocketDisconnect:
         manager.disconnect(trip_id, websocket)
