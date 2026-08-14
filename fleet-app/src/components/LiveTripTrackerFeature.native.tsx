@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import theme from '../theme';
 import { Driver } from '../data/mockFleetData';
@@ -8,6 +9,12 @@ import { api } from '../api/client';
 interface Props {
   driver: Driver;
 }
+
+const CITY_COORDINATES: { [key: string]: { latitude: number; longitude: number } } = {
+  bangalore: { latitude: 12.9716, longitude: 77.5946 },
+  delhi: { latitude: 28.6139, longitude: 77.2090 },
+  mumbai: { latitude: 19.0760, longitude: 72.8777 },
+};
 
 export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
   const [gpsPoints, setGpsPoints] = useState<{ lat: number; lng: number; timestamp: string }[]>([]);
@@ -18,7 +25,24 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
   const [liveHarshCorners, setLiveHarshCorners] = useState<number>(0);
   const [liveSpeeding, setLiveSpeeding] = useState<number>(0);
 
+  const lowercaseCity = (driver.city || 'bangalore').trim().toLowerCase();
+  const defaultCoords = CITY_COORDINATES[lowercaseCity] || CITY_COORDINATES['bangalore'];
+
   const hasGpsData = gpsPoints && gpsPoints.length > 0;
+
+  const initialRegion = hasGpsData
+    ? {
+        latitude: gpsPoints[gpsPoints.length - 1].lat,
+        longitude: gpsPoints[gpsPoints.length - 1].lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }
+    : {
+        latitude: defaultCoords.latitude,
+        longitude: defaultCoords.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
 
   // Poll active trip status on load
   useEffect(() => {
@@ -83,7 +107,7 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
       : 'ws://127.0.0.1:8001/api/v1';
     const wsUrl = `${wsBaseUrl}/auth/ws/trip/${activeTripId}/listen`;
 
-    console.log('Connecting Live Tracking WS (Web):', wsUrl);
+    console.log('Connecting Live Tracking WS:', wsUrl);
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (e) => {
@@ -132,19 +156,37 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
-      {/* Web Map Placeholder */}
+      {/* Map View Wrapper */}
       <View style={styles.mapWrapper}>
-        <View style={styles.webMapFallback}>
-          <MaterialIcons name="map" size={36} color={theme.colors.brandTeal} style={{ marginBottom: 8 }} />
-          <Text style={styles.webMapTitle}>Interactive Map View is active on Android/iOS</Text>
-          {hasGpsData ? (
-            <Text style={styles.webMapSubtitle}>
-              GPS Coordinates: {gpsPoints[gpsPoints.length - 1].lat.toFixed(5)}, {gpsPoints[gpsPoints.length - 1].lng.toFixed(5)}
-            </Text>
-          ) : (
-            <Text style={styles.webMapSubtitle}>Waiting for GPS signals...</Text>
+        <MapView
+          style={styles.map}
+          initialRegion={initialRegion}
+          showsUserLocation={false}
+          showsMyLocationButton={false}
+          zoomEnabled={true}
+          scrollEnabled={true}
+        >
+          {hasGpsData && (
+            <>
+              <Polyline
+                coordinates={gpsPoints.map(p => ({ latitude: p.lat, longitude: p.lng }))}
+                strokeColor={theme.colors.primary}
+                strokeWidth={4}
+              />
+              <Marker
+                coordinate={{
+                  latitude: gpsPoints[gpsPoints.length - 1].lat,
+                  longitude: gpsPoints[gpsPoints.length - 1].lng,
+                }}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <View style={styles.truckMarker}>
+                  <MaterialIcons name="local-shipping" size={16} color="#000" />
+                </View>
+              </Marker>
+            </>
           )}
-        </View>
+        </MapView>
 
         {/* Speed HUD Overlay */}
         <View style={styles.liveOverlayBadge}>
@@ -222,24 +264,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.outlineVariant,
   },
-  webMapFallback: {
+  map: {
     flex: 1,
-    backgroundColor: '#0f0f12',
+  },
+  truckMarker: {
+    backgroundColor: theme.colors.primary,
+    padding: 8,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-  },
-  webMapTitle: {
-    color: '#ffffff',
-    fontWeight: '600',
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  webMapSubtitle: {
-    color: theme.colors.onSurfaceVariant,
-    marginTop: 6,
-    fontSize: 11,
-    fontWeight: '600',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 4,
   },
   liveOverlayBadge: {
     position: 'absolute',

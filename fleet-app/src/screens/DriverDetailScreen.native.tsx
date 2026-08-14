@@ -672,5 +672,57 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
+  liveTelemetryCard: {
+    backgroundColor: theme.colors.surfaceContainerLow || 'rgba(255, 255, 255, 0.05)',
+    borderRadius: theme.rounded.md,
+    borderWidth: 1,
+    borderColor: theme.colors.outlineVariant,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  telemetrySectionTitle: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: theme.colors.onSurfaceVariant,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  telemetryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  telemetryLocationText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.onSurface,
+    flex: 1,
+  },
+  telemetryStatsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  telemetryStatBox: {
+    flex: 1,
+    backgroundColor: theme.colors.surfaceContainer || 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: theme.colors.outlineVariant,
+    borderRadius: theme.rounded.sm,
+    padding: 8,
+    alignItems: 'center',
+  },
+  telemetryStatLabel: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  telemetryStatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
 });
 export default DriverDetailScreen;
