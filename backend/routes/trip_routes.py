@@ -134,9 +134,8 @@ async def get_trip(trip_id: str, db: Session = Depends(get_db)):
         # Get last geocoded location name from cache
         state = trip_geocode_state.get(trip_id)
         current_location = state["last_name"] if (state and state.get("last_name")) else None
-        if not current_location and gps_points:
-            last_pt = gps_points[-1]
-            current_location = f"{float(last_pt.latitude):.5f}, {float(last_pt.longitude):.5f}"
+        if not current_location:
+            current_location = "Locating..."
             
         return {
             "status": "success",

@@ -180,9 +180,9 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                 
                 session.commit()
                 
-                # Get location name (either from in-memory cache or format current lat/lng)
+                # Get location name (either from in-memory cache or fallback to "Locating...")
                 state = trip_geocode_state.get(trip_id)
-                location_name = state["last_name"] if (state and state.get("last_name")) else f"{lat:.5f}, {lng:.5f}"
+                location_name = state["last_name"] if (state and state.get("last_name")) else "Locating..."
                 
                 # Broadcast payload to listeners (like fleet-app)
                 broadcast_payload = {
@@ -202,7 +202,7 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                 session.rollback()
                 logger.error(f"Error saving telemetry to database: {str(e)}")
                 state = trip_geocode_state.get(trip_id)
-                location_name = state["last_name"] if (state and state.get("last_name")) else f"{lat:.5f}, {lng:.5f}"
+                location_name = state["last_name"] if (state and state.get("last_name")) else "Locating..."
             finally:
                 session.close()
                 

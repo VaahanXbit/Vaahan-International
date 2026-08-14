@@ -81,7 +81,7 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
                     if display_name:
                         parts = [p.strip() for p in display_name.split(",")[:2]]
                 
-                location_name = ", ".join(parts) if parts else f"{lat:.4f}, {lng:.4f}"
+                location_name = ", ".join(parts) if parts else "Locating..."
                 
                 # Update trip cache
                 trip_geocode_state[trip_id] = {
@@ -99,4 +99,4 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
     # Return previous cached location on any failure/timeout
     if state and state["last_name"]:
         return state["last_name"]
-    return f"{lat:.5f}, {lng:.5f}"
+    return "Locating..."
