@@ -3,14 +3,6 @@ package com.vaahan.driver.ui.screens.trip
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
-import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,17 +27,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.vaahan.driver.config.AppConfig
 import com.vaahan.driver.data.api.RetrofitClient
 import com.vaahan.driver.ui.theme.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import org.json.JSONObject
-import java.time.Instant
+import android.content.Intent
+import android.os.Build
+import androidx.compose.runtime.collectAsState
+import com.vaahan.driver.service.TelemetryService
+import com.vaahan.driver.service.TelemetryState
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,176 +46,65 @@ fun ActiveTripScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Sensor states
-    var currentSpeed by remember { mutableStateOf(0.0) }
-    var lat by remember { mutableStateOf(0.0) }
-    var lng by remember { mutableStateOf(0.0) }
-    var accelX by remember { mutableStateOf(0.0) }
-    var accelY by remember { mutableStateOf(0.0) }
-    var accelZ by remember { mutableStateOf(0.0) }
-    var locationName by remember { mutableStateOf("Locating...") }
-
-    // Event states (incremented via WebSocket feedback)
-    var harshBrakes by remember { mutableStateOf(0) }
-    var harshCorners by remember { mutableStateOf(0) }
-    var speeding by remember { mutableStateOf(0) }
+    // Collect state flows from the background TelemetryService
+    val currentSpeed by TelemetryState.liveSpeed.collectAsState()
+    val lat by TelemetryState.liveLat.collectAsState()
+    val lng by TelemetryState.liveLng.collectAsState()
+    val locationName by TelemetryState.liveLocationName.collectAsState()
+    val harshBrakes by TelemetryState.harshBrakes.collectAsState()
+    val harshCorners by TelemetryState.harshCorners.collectAsState()
+    val speeding by TelemetryState.speeding.collectAsState()
+    val isConnected by TelemetryState.isConnected.collectAsState()
 
     // Sliding button properties
     var slideOffset by remember { mutableStateOf(0f) }
     val maxSlideOffset = 220f // Maximum drag offset in dp
     val density = context.resources.displayMetrics.density
 
-    // WebSocket state
-    val webSocketRef = remember { mutableStateOf<WebSocket?>(null) }
-    val isConnected = remember { mutableStateOf(false) }
-
-    // Sensor managers
-    val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
-    val locationManager = remember { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
-
-    // Accelerometer listener
-    val sensorListener = remember {
-        object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent?) {
-                if (event != null && event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-                    accelX = event.values[0].toDouble() / 9.81
-                    accelY = event.values[1].toDouble() / 9.81
-                    accelZ = event.values[2].toDouble() / 9.81
+    // Request permissions launcher (Location + Notification permissions needed for background tracking)
+    val permissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { permissions ->
+            val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+            if (fineLocationGranted) {
+                // Permissions granted, launch TelemetryService in foreground
+                val intent = Intent(context, TelemetryService::class.java).apply {
+                    putExtra("tripId", tripId)
                 }
-            }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-        }
-    }
-
-    // Location GPS listener
-    val locationListener = remember {
-        object : LocationListener {
-            override fun onLocationChanged(location: Location) {
-                lat = location.latitude
-                lng = location.longitude
-                currentSpeed = location.speed * 3.6 // m/s to km/h
-            }
-            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-            override fun onProviderEnabled(provider: String) {}
-            override fun onProviderDisabled(provider: String) {}
-        }
-    }
-
-    // Connect WebSocket
-    LaunchedEffect(tripId) {
-        val wsUrl = AppConfig.WS_URL + tripId
-        val client = OkHttpClient()
-        val request = Request.Builder().url(wsUrl).build()
-
-        val listener = object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: okhttp3.Response) {
-                isConnected.value = true
-                webSocketRef.value = webSocket
-            }
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                try {
-                    val json = JSONObject(text)
-                    if (json.optBoolean("received", false)) {
-                        val event = json.optString("event_detected", "")
-                        if (event == "harsh_brake") {
-                            harshBrakes++
-                        } else if (event == "harsh_corner") {
-                            harshCorners++
-                        } else if (event == "speeding") {
-                            speeding++
-                        }
-                        val resolvedLoc = json.optString("location_name", "")
-                        if (resolvedLoc.isNotEmpty()) {
-                            locationName = resolvedLoc
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                isConnected.value = false
-            }
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: okhttp3.Response?) {
-                isConnected.value = false
-            }
-        }
-        webSocketRef.value = client.newWebSocket(request, listener)
-    }
-
-    // Request Location Permission
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted ->
-            if (granted) {
-                try {
-                    locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER,
-                        1000L,
-                        1f,
-                        locationListener
-                    )
-                } catch (se: SecurityException) {
-                    se.printStackTrace()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
                 }
             } else {
-                Toast.makeText(context, "Location permission is required for speedometer", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Location permission is required for telematic speedometer", Toast.LENGTH_SHORT).show()
             }
         }
     )
 
-    // Register listeners
-    DisposableEffect(Unit) {
-        // Register accelerometer
-        val accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        if (accelSensor != null) {
-            sensorManager.registerListener(sensorListener, accelSensor, SensorManager.SENSOR_DELAY_UI)
+    // Launch Background Telemetry Service
+    LaunchedEffect(tripId) {
+        val permissionsToRequest = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // Register location
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            try {
-                locationManager.requestLocationUpdates(
-                    LocationManager.GPS_PROVIDER,
-                    1000L,
-                    1f,
-                    locationListener
-                )
-            } catch (se: SecurityException) {
-                se.printStackTrace()
+        // Check if fine location permission is already granted
+        val hasFineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (hasFineLocation) {
+            val intent = Intent(context, TelemetryService::class.java).apply {
+                putExtra("tripId", tripId)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
             }
         } else {
-            launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-
-        onDispose {
-            sensorManager.unregisterListener(sensorListener)
-            locationManager.removeUpdates(locationListener)
-            webSocketRef.value?.close(1000, "Trip exited active screen")
-        }
-    }
-
-    // Telemetry Send Loop
-    LaunchedEffect(isConnected.value) {
-        while (isConnected.value) {
-            val ws = webSocketRef.value
-            if (ws != null) {
-                try {
-                    val payload = JSONObject().apply {
-                        put("lat", lat)
-                        put("lng", lng)
-                        put("speed_kmh", currentSpeed)
-                        put("accel_x", accelX)
-                        put("accel_y", accelY)
-                        put("accel_z", accelZ)
-                        put("timestamp", Instant.now().toString())
-                    }
-                    ws.send(payload.toString())
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            delay(1000L)
+            permissionsLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
 
@@ -456,7 +334,7 @@ fun ActiveTripScreen(
                                     // Slide success! End the trip.
                                     coroutineScope.launch {
                                         try {
-                                            webSocketRef.value?.close(1000, "Trip slide-ended")
+                                            context.stopService(Intent(context, TelemetryService::class.java))
                                             val response = RetrofitClient.api.endTrip(tripId, 0.0, 0)
                                             if (response.isSuccessful) {
                                                 onNavigateToSummary(tripId)

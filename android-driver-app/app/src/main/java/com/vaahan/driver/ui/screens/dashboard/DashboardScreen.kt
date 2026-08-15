@@ -57,7 +57,7 @@ fun DashboardScreen(
 
     var onboardingStage by remember { 
         mutableStateOf(
-            if (initialCompanyName == null || initialCompanyName == "Independent Drivers") 
+            if ((initialCompanyName == null || initialCompanyName == "Independent Drivers") && !sharedPref.getBoolean("has_shown_fleet_onboard", false)) 
                 OnboardingStage.FLEET_ONBOARD 
             else 
                 OnboardingStage.NONE
@@ -167,7 +167,10 @@ fun DashboardScreen(
                                     modifier = Modifier
                                         .size(32.dp)
                                         .background(Color(0xFFF3F4F6), CircleShape)
-                                        .clickable { onboardingStage = OnboardingStage.NONE },
+                                        .clickable { 
+                                            sharedPref.edit().putBoolean("has_shown_fleet_onboard", true).apply()
+                                            onboardingStage = OnboardingStage.NONE 
+                                        },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
@@ -319,12 +322,16 @@ fun DashboardScreen(
                                                         vehicleNumber = vehicle
                                                     )
 
-                                                    if (response.isSuccessful && response.body() != null) {
-                                                        val body = response.body()!!
-                                                        sharedPref.edit().putString("company_name", body.company_name).apply()
-                                                        currentCompanyName = body.company_name ?: "Independent Drivers"
-                                                        Toast.makeText(context, body.message, Toast.LENGTH_SHORT).show()
-                                                        onboardingStage = OnboardingStage.NONE
+                                                     if (response.isSuccessful && response.body() != null) {
+                                                         val body = response.body()!!
+                                                         sharedPref.edit().apply {
+                                                             putString("company_name", body.company_name)
+                                                             putBoolean("has_shown_fleet_onboard", true)
+                                                             apply()
+                                                         }
+                                                         currentCompanyName = body.company_name ?: "Independent Drivers"
+                                                         Toast.makeText(context, body.message, Toast.LENGTH_SHORT).show()
+                                                         onboardingStage = OnboardingStage.NONE
                                                     } else {
                                                         val err = response.errorBody()?.string() ?: "Invalid Fleet PIN"
                                                         Toast.makeText(context, err, Toast.LENGTH_LONG).show()

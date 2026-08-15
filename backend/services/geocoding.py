@@ -66,20 +66,29 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
                 data = response.json()
                 address = data.get("address", {})
                 
-                # Construct short, readable display name: road + suburb/city
+                # Construct detailed, readable display name: building/amenity + house_number + road + suburb + city + postcode
                 parts = []
-                for key in ["road", "suburb", "city_district", "city", "town", "village", "state"]:
+                # 1. Add specific landmarks / buildings / house numbers first
+                for key in ["building", "amenity", "house_number", "industrial", "office"]:
                     val = address.get(key)
                     if val and val not in parts:
                         parts.append(val)
-                        if len(parts) >= 2:
-                            break
+                # 2. Add road and suburb/neighborhood
+                for key in ["road", "neighbourhood", "suburb", "city_district"]:
+                    val = address.get(key)
+                    if val and val not in parts:
+                        parts.append(val)
+                # 3. Add city/town and postal code
+                for key in ["city", "town", "village", "postcode"]:
+                    val = address.get(key)
+                    if val and val not in parts:
+                        parts.append(val)
                 
                 # Fallback to display_name snippet if address keys are missing
                 if not parts:
                     display_name = data.get("display_name", "")
                     if display_name:
-                        parts = [p.strip() for p in display_name.split(",")[:2]]
+                        parts = [p.strip() for p in display_name.split(",")[:4]]
                 
                 location_name = ", ".join(parts) if parts else "Locating..."
                 

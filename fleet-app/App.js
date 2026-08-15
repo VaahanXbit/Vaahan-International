@@ -32,6 +32,7 @@ import { DashboardScreen } from './src/screens/DashboardScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { DriverDetailScreen } from './src/screens/DriverDetailScreen';
 import { FeatureDetailScreen } from './src/screens/FeatureDetailScreen';
+import { TelemetryProvider } from './src/context/TelemetryContext';
 
 // ============================================================================
 // REDUX STORE
@@ -145,9 +146,11 @@ const RootNavigator = () => {
 export default function App() {
   return (
     <Provider store={store}>
-      <SafeAreaProvider>
-        <RootNavigator />
-      </SafeAreaProvider>
+      <TelemetryProvider>
+        <SafeAreaProvider>
+          <RootNavigator />
+        </SafeAreaProvider>
+      </TelemetryProvider>
     </Provider>
   );
 }

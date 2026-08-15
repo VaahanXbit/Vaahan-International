@@ -237,6 +237,7 @@ fun LoginScreen(onNavigateToDashboard: () -> Unit) {
                                             putString("vehicle_number", body.vehicle_number)
                                             putString("company_name", body.company_name)
                                             putString("access_token", body.access_token)
+                                            putBoolean("has_shown_fleet_onboard", false)
                                             apply()
                                         }
 

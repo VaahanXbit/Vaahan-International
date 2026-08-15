@@ -5,6 +5,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import theme from '../theme';
 import { Driver } from '../data/mockFleetData';
 import { api } from '../api/client';
+import { useTelemetry } from '../context/TelemetryContext';
 
 interface Props {
   driver: Driver;
@@ -17,13 +18,24 @@ const CITY_COORDINATES: { [key: string]: { latitude: number; longitude: number }
 };
 
 export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
-  const [gpsPoints, setGpsPoints] = useState<{ lat: number; lng: number; timestamp: string }[]>([]);
+  const { startTrackingTrip, getTelemetryState, setInitialTelemetry } = useTelemetry();
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
-  const [liveSpeed, setLiveSpeed] = useState<number>(0);
-  const [liveLocation, setLiveLocation] = useState<string>('Locating...');
-  const [liveHarshBrakes, setLiveHarshBrakes] = useState<number>(0);
-  const [liveHarshCorners, setLiveHarshCorners] = useState<number>(0);
-  const [liveSpeeding, setLiveSpeeding] = useState<number>(0);
+
+  const telemetryState = activeTripId ? getTelemetryState(activeTripId) : {
+    gpsPoints: [],
+    liveSpeed: 0,
+    liveLocation: 'Locating...',
+    liveHarshBrakes: 0,
+    liveHarshCorners: 0,
+    liveSpeeding: 0
+  };
+
+  const gpsPoints = telemetryState.gpsPoints;
+  const liveSpeed = telemetryState.liveSpeed;
+  const liveLocation = telemetryState.liveLocation;
+  const liveHarshBrakes = telemetryState.liveHarshBrakes;
+  const liveHarshCorners = telemetryState.liveHarshCorners;
+  const liveSpeeding = telemetryState.liveSpeeding;
 
   const lowercaseCity = (driver.city || 'bangalore').trim().toLowerCase();
   const defaultCoords = CITY_COORDINATES[lowercaseCity] || CITY_COORDINATES['bangalore'];
@@ -55,6 +67,7 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
             const activeTrip = res.data.trips.find((t: any) => t.status === 'active');
             if (activeTrip) {
               setActiveTripId(activeTrip.id);
+              startTrackingTrip(activeTrip.id);
               api.getTrip(activeTrip.id)
                 .then(tripRes => {
                   if (tripRes.data?.gps_points) {
@@ -63,25 +76,21 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
                       lng: parseFloat(p.longitude),
                       timestamp: p.timestamp,
                     }));
-                    setGpsPoints(points);
-                  }
-                  if (tripRes.data?.trip) {
-                    setLiveHarshBrakes(tripRes.data.trip.harsh_brake_count || 0);
-                    setLiveHarshCorners(tripRes.data.trip.harsh_corner_count || 0);
-                    setLiveSpeeding(tripRes.data.trip.speeding_count || 0);
-                    if (tripRes.data.trip.current_location) {
-                      setLiveLocation(tripRes.data.trip.current_location);
-                    }
+                    setInitialTelemetry(activeTrip.id, {
+                      gpsPoints: points,
+                      liveHarshBrakes: tripRes.data.trip?.harsh_brake_count || 0,
+                      liveHarshCorners: tripRes.data.trip?.harsh_corner_count || 0,
+                      liveSpeeding: tripRes.data.trip?.speeding_count || 0,
+                      liveLocation: tripRes.data.trip?.current_location || 'Locating...'
+                    });
                   }
                 })
                 .catch(err => console.error('Error fetching active trip details:', err));
             } else {
               setActiveTripId(null);
-              setGpsPoints([]);
             }
           } else {
             setActiveTripId(null);
-            setGpsPoints([]);
           }
         })
         .catch(err => console.error('Error listing trips for driver:', err));
@@ -96,84 +105,6 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
       }
     };
   }, [driver.id]);
-
-  // WebSocket Live Updates
-  useEffect(() => {
-    if (!activeTripId) {
-      setLiveSpeed(0);
-      setLiveLocation('Locating...');
-      return;
-    }
-
-    const wsBaseUrl = api.baseURL 
-      ? api.baseURL.replace('http://', 'ws://').replace('https://', 'wss://') 
-      : 'ws://127.0.0.1:8001/api/v1';
-    const wsUrl = `${wsBaseUrl}/auth/ws/trip/${activeTripId}/listen`;
-
-    let ws: WebSocket | null = null;
-    let reconnectTimeout: any = null;
-    let isClosedIntentional = false;
-
-    const connect = () => {
-      if (isClosedIntentional) return;
-      console.log('Connecting Live Tracking WS:', wsUrl);
-      ws = new WebSocket(wsUrl);
-
-      ws.onopen = () => {
-        console.log('Live Tracking WS Connected successfully!');
-      };
-
-      ws.onerror = (err) => {
-        console.error('Live Tracking WS Error:', err);
-      };
-
-      ws.onclose = (event) => {
-        console.log('Live Tracking WS Closed:', event.code, event.reason);
-        if (!isClosedIntentional) {
-          console.log('WS connection dropped. Reconnecting in 3s...');
-          reconnectTimeout = setTimeout(connect, 3000);
-        }
-      };
-
-      ws.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          console.log('Live Tracking WS Message Received:', data);
-          if (data.lat && data.lng) {
-            setGpsPoints(prev => {
-              if (prev.some(p => p.timestamp === data.timestamp)) return prev;
-              return [...prev, { lat: data.lat, lng: data.lng, timestamp: data.timestamp }];
-            });
-          }
-          if (data.speed_kmh !== undefined) {
-            setLiveSpeed(data.speed_kmh);
-          }
-          if (data.location_name) {
-            setLiveLocation(data.location_name);
-          }
-          if (data.event_detected) {
-            if (data.event_detected === 'harsh_brake') {
-              setLiveHarshBrakes(prev => prev + 1);
-            } else if (data.event_detected === 'harsh_corner') {
-              setLiveHarshCorners(prev => prev + 1);
-            } else if (data.event_detected === 'speeding') {
-              setLiveSpeeding(prev => prev + 1);
-            }
-          }
-        } catch (err) {
-          console.error('Error parsing live WS payload:', err);
-        }
-      };
-    };
-
-    connect();
-
-    return () => {
-      isClosedIntentional = true;
-      if (ws) ws.close();
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-    };
-  }, [activeTripId]);
 
   if (!activeTripId) {
     return (
