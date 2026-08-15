@@ -66,6 +66,11 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
         headers = None
         
     try:
+        if geoapify_key:
+            logger.info(f"🛰️ Calling Geoapify reverse geocoding API for coordinates: ({lat}, {lng})")
+        else:
+            logger.info(f"🛰️ Calling public Nominatim reverse geocoding API for coordinates: ({lat}, {lng})")
+
         async with httpx.AsyncClient(timeout=3.0) as client:
             response = await client.get(url, headers=headers) if headers else await client.get(url)
             
