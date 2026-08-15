@@ -37,9 +37,9 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
             logger.debug(f"Geocoding throttled for trip {trip_id}. Returning cached: {state['last_name']}")
             return state["last_name"]
 
-    locationiq_key = os.getenv("LOCATIONIQ_API_KEY")
+    geoapify_key = os.getenv("GEOAPIFY_API_KEY")
 
-    if not locationiq_key:
+    if not geoapify_key:
         # 2. Global Rate Limiter (Only needed for free public Nominatim): Max 1 request per second globally
         global_elapsed = now - last_global_api_call_time
         if global_elapsed < 1.0:
@@ -61,8 +61,8 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
             "User-Agent": "VaahanFleetApp/1.0 (contact: info@vaahan.com)"
         }
     else:
-        # Query LocationIQ (no global 1s throttling required)
-        url = f"https://us1.locationiq.com/v1/reverse?key={locationiq_key}&lat={lat}&lon={lng}&format=json"
+        # Query Geoapify (no global 1s throttling required)
+        url = f"https://api.geoapify.com/v1/geocode/reverse?lat={lat}&lon={lng}&apiKey={geoapify_key}"
         headers = None
         
     try:
@@ -71,35 +71,54 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
             
             if response.status_code == 200:
                 data = response.json()
-                address = data.get("address", {})
                 
-                # Construct detailed, readable display name: building/amenity + house_number + road + suburb + city + postcode
-                parts = []
-                # 1. Add specific landmarks / buildings / house numbers first
-                for key in ["building", "amenity", "house_number", "industrial", "office"]:
-                    val = address.get(key)
-                    if val and val not in parts:
-                        parts.append(val)
-                # 2. Add road and suburb/neighborhood
-                for key in ["road", "neighbourhood", "suburb", "city_district"]:
-                    val = address.get(key)
-                    if val and val not in parts:
-                        parts.append(val)
-                # 3. Add city/town/county/state and postal code
-                for key in ["city", "town", "village", "county", "state", "postcode"]:
-                    val = address.get(key)
-                    if val and val not in parts:
-                        parts.append(val)
-                
-                # Check if the generated parts list has too little detail (e.g., only postcode, or only 1 part)
-                has_geo = any(k in address for k in ["building", "amenity", "house_number", "road", "neighbourhood", "suburb", "city_district", "city", "town", "village", "county"])
-                if len(parts) < 2 or not has_geo:
-                    display_name = data.get("display_name", "")
-                    if display_name:
-                        # Extract first 4 segments of the formatted display name
-                        parts = [p.strip() for p in display_name.split(",")[:4]]
-                
-                location_name = ", ".join(parts) if parts else "Locating..."
+                if geoapify_key:
+                    # Parse Geoapify structure: features[0].properties
+                    if "features" in data and len(data["features"]) > 0:
+                        prop = data["features"][0].get("properties", {})
+                        formatted = prop.get("formatted", "")
+                        if formatted:
+                            parts = [p.strip() for p in formatted.split(",") if p.strip()]
+                            # Remove trailing country to keep it short for UI card displays
+                            if parts and parts[-1].lower() in ["india", "in"]:
+                                parts.pop()
+                            parts = parts[:4]
+                            location_name = ", ".join(parts)
+                        else:
+                            location_name = "Locating..."
+                    else:
+                        location_name = "Locating..."
+                else:
+                    # Parse standard Nominatim structure
+                    address = data.get("address", {})
+                    
+                    # Construct detailed, readable display name: building/amenity + house_number + road + suburb + city + postcode
+                    parts = []
+                    # 1. Add specific landmarks / buildings / house numbers first
+                    for key in ["building", "amenity", "house_number", "industrial", "office"]:
+                        val = address.get(key)
+                        if val and val not in parts:
+                            parts.append(val)
+                    # 2. Add road and suburb/neighborhood
+                    for key in ["road", "neighbourhood", "suburb", "city_district"]:
+                        val = address.get(key)
+                        if val and val not in parts:
+                            parts.append(val)
+                    # 3. Add city/town/county/state and postal code
+                    for key in ["city", "town", "village", "county", "state", "postcode"]:
+                        val = address.get(key)
+                        if val and val not in parts:
+                            parts.append(val)
+                    
+                    # Check if the generated parts list has too little detail (e.g., only postcode, or only 1 part)
+                    has_geo = any(k in address for k in ["building", "amenity", "house_number", "road", "neighbourhood", "suburb", "city_district", "city", "town", "village", "county"])
+                    if len(parts) < 2 or not has_geo:
+                        display_name = data.get("display_name", "")
+                        if display_name:
+                            # Extract first 4 segments of the formatted display name
+                            parts = [p.strip() for p in display_name.split(",")[:4]]
+                    
+                    location_name = ", ".join(parts) if parts else "Locating..."
                 
                 # Update trip cache
                 trip_geocode_state[trip_id] = {
@@ -110,9 +129,9 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
                 }
                 return location_name
             else:
-                logger.warning(f"Nominatim returned non-200 status code: {response.status_code}")
+                logger.warning(f"Geocoding service returned non-200 status code: {response.status_code}")
     except Exception as e:
-        logger.warning(f"Error calling Nominatim reverse geocode for {lat}, {lng}: {str(e)}")
+        logger.warning(f"Error calling geocoding service for {lat}, {lng}: {str(e)}")
         
     # Return previous cached location on any failure/timeout
     if state and state["last_name"]:
