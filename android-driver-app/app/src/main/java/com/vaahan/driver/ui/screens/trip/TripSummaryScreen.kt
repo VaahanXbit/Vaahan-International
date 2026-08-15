@@ -30,18 +30,30 @@ fun TripSummaryScreen(
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(tripId) {
-        try {
-            val response = RetrofitClient.api.getTrip(tripId)
-            if (response.isSuccessful && response.body()?.status == "success") {
-                tripDetails = response.body()?.trip
-            } else {
-                Toast.makeText(context, "Could not fetch summary: ${response.message()}", Toast.LENGTH_SHORT).show()
+        var attempts = 0
+        while (attempts < 4) {
+            try {
+                val response = RetrofitClient.api.getTrip(tripId)
+                if (response.isSuccessful && response.body()?.status == "success") {
+                    val trip = response.body()?.trip
+                    tripDetails = trip
+                    if (trip != null && (trip.distance_km > 0.0 || trip.total_events > 0)) {
+                        break
+                    }
+                } else if (attempts == 0) {
+                    Toast.makeText(context, "Could not fetch summary: ${response.message()}", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                if (attempts == 0) {
+                    Toast.makeText(context, "Network error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
-        } catch (e: Exception) {
-            Toast.makeText(context, "Network error: ${e.message}", Toast.LENGTH_SHORT).show()
-        } finally {
-            isLoading = false
+            attempts++
+            if (attempts < 4) {
+                kotlinx.coroutines.delay(1200L)
+            }
         }
+        isLoading = false
     }
 
     Box(
