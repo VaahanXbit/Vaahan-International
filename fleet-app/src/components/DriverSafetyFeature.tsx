@@ -5,16 +5,25 @@ import { Driver } from '../data/mockFleetData';
 
 interface Props {
   driver: Driver;
+  harshBrakes?: number;
+  harshCorners?: number;
+  speeding?: number;
+  safetyScore?: number;
 }
 
-export const DriverSafetyFeature: React.FC<Props> = ({ driver }) => {
+export const DriverSafetyFeature: React.FC<Props> = ({ driver, harshBrakes, harshCorners, speeding, safetyScore }) => {
+  const finalScore = safetyScore !== undefined ? safetyScore : driver.efficiencyScore;
+  const brakesCount = harshBrakes !== undefined ? harshBrakes : 2;
+  const cornersCount = harshCorners !== undefined ? harshCorners : 92;
+  const speedingCount = speeding !== undefined ? speeding : 0;
+
   return (
     <View style={styles.contentCard}>
       <Text style={[theme.typography.labelCaps, styles.cardLabel]}>SAFETY SCORE CARD</Text>
 
       {/* Score circle banner */}
       <View style={styles.safetyScoreBanner}>
-        <Text style={styles.safetyScoreVal}>{driver.efficiencyScore}</Text>
+        <Text style={styles.safetyScoreVal}>{typeof finalScore === 'number' ? finalScore.toFixed(0) : finalScore}</Text>
         <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant }]}>
           OVERALL SAFETY INDEX
         </Text>
@@ -24,19 +33,19 @@ export const DriverSafetyFeature: React.FC<Props> = ({ driver }) => {
       <View style={styles.detailsList}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Harsh Braking Events</Text>
-          <Text style={styles.detailVal}>2 times (Last 7 days)</Text>
+          <Text style={styles.detailVal}>{brakesCount} times</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Rapid Acceleration</Text>
-          <Text style={styles.detailVal}>1 time (Last 7 days)</Text>
+          <Text style={styles.detailVal}>{cornersCount < 85 ? '1 time' : '0 times'}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Speed Violation Occurrences</Text>
-          <Text style={styles.detailVal}>0 times</Text>
+          <Text style={styles.detailVal}>{speedingCount} times</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Harsh Cornering Factor</Text>
-          <Text style={styles.detailVal}>92 / 100</Text>
+          <Text style={styles.detailVal}>{cornersCount} / 100</Text>
         </View>
       </View>
     </View>

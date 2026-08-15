@@ -67,6 +67,11 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [gpsPoints, setGpsPoints] = useState<{ lat: number; lng: number; timestamp: string }[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [liveSpeed, setLiveSpeed] = useState<number>(0);
+  const [completedTrips, setCompletedTrips] = useState<any[]>([]);
+  const [dbHarshBrakes, setDbHarshBrakes] = useState(0);
+  const [dbHarshCorners, setDbHarshCorners] = useState(0);
+  const [dbSpeeding, setDbSpeeding] = useState(0);
+  const [dbSafetyScore, setDbSafetyScore] = useState<number | undefined>(undefined);
 
   const companyCity = useSelector((state: any) => state.auth.user?.city);
   const lowercaseCity = (companyCity || 'bangalore').trim().toLowerCase();
@@ -99,8 +104,30 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       const fetchActiveTelemetry = () => {
         api.listTrips(driverId)
           .then(res => {
-            if (res.data?.trips?.length > 0) {
-              const activeTrip = res.data.trips.find((t: any) => t.status === 'active');
+            if (res.data?.trips) {
+              const allTrips = res.data.trips;
+              setCompletedTrips(allTrips);
+
+              // Aggregate statistics from all completed trips
+              const completedOnly = allTrips.filter((t: any) => t.status === 'completed');
+              if (completedOnly.length > 0) {
+                const totalBrakes = completedOnly.reduce((sum: number, t: any) => sum + (t.harsh_brake_count || 0), 0);
+                const totalCorners = completedOnly.reduce((sum: number, t: any) => sum + (t.harsh_corner_count || 0), 0);
+                const totalSpeeding = completedOnly.reduce((sum: number, t: any) => sum + (t.speeding_count || 0), 0);
+                const avgScore = completedOnly.reduce((sum: number, t: any) => sum + (t.final_score || 100), 0) / completedOnly.length;
+
+                setDbHarshBrakes(totalBrakes);
+                setDbHarshCorners(totalCorners);
+                setDbSpeeding(totalSpeeding);
+                setDbSafetyScore(avgScore);
+              } else {
+                setDbHarshBrakes(0);
+                setDbHarshCorners(92); // default mock-aligned
+                setDbSpeeding(0);
+                setDbSafetyScore(undefined);
+              }
+
+              const activeTrip = allTrips.find((t: any) => t.status === 'active');
               if (activeTrip) {
                 setActiveTripId(activeTrip.id);
                 api.getTrip(activeTrip.id)
@@ -292,22 +319,22 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 )}
               </View>
 
-              {driver.trips.length > 0 ? (
-                driver.trips.map(trip => (
+              {completedTrips.length > 0 ? (
+                completedTrips.map(trip => (
                   <View key={trip.id} style={styles.tripRow}>
                     <View style={styles.tripLeft}>
                       <MaterialIcons name="local-shipping" size={20} color={theme.colors.onSurfaceVariant} />
                       <View style={styles.tripText}>
                         <Text style={[theme.typography.bodyMd, { color: theme.colors.onSurface, fontWeight: '500' }]}>
-                          {trip.route}
+                          Trip {trip.id.substring(0, 8).toUpperCase()} (Score: {trip.final_score !== null ? trip.final_score.toFixed(0) : 'N/A'})
                         </Text>
                         <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant, fontSize: 9, marginTop: 2 }]}>
-                          {trip.timestamp}
+                          {trip.start_time ? new Date(trip.start_time).toLocaleString() : 'N/A'}
                         </Text>
                       </View>
                     </View>
                     <Text style={[theme.typography.bodyMd, { color: theme.colors.primary, fontWeight: '600' }]}>
-                      {trip.distance}
+                      {trip.distance_km !== null ? `${parseFloat(trip.distance_km).toFixed(1)} km` : '0.0 km'}
                     </Text>
                   </View>
                 ))

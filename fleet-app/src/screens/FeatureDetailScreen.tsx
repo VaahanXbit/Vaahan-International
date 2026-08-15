@@ -36,12 +36,35 @@ export const FeatureDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { feature, driverId } = route.params;
   const [driver, setDriver] = useState<Driver | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dbHarshBrakes, setDbHarshBrakes] = useState(0);
+  const [dbHarshCorners, setDbHarshCorners] = useState(0);
+  const [dbSpeeding, setDbSpeeding] = useState(0);
+  const [dbSafetyScore, setDbSafetyScore] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     getDriverDetail(driverId).then(data => {
       setDriver(data);
       setLoading(false);
     });
+
+    api.listTrips(driverId)
+      .then(res => {
+        if (res.data?.trips) {
+          const completedOnly = res.data.trips.filter((t: any) => t.status === 'completed');
+          if (completedOnly.length > 0) {
+            const totalBrakes = completedOnly.reduce((sum: number, t: any) => sum + (t.harsh_brake_count || 0), 0);
+            const totalCorners = completedOnly.reduce((sum: number, t: any) => sum + (t.harsh_corner_count || 0), 0);
+            const totalSpeeding = completedOnly.reduce((sum: number, t: any) => sum + (t.speeding_count || 0), 0);
+            const avgScore = completedOnly.reduce((sum: number, t: any) => sum + (t.final_score || 100), 0) / completedOnly.length;
+
+            setDbHarshBrakes(totalBrakes);
+            setDbHarshCorners(totalCorners);
+            setDbSpeeding(totalSpeeding);
+            setDbSafetyScore(avgScore);
+          }
+        }
+      })
+      .catch(err => console.error('Error fetching driver safety stats from trips:', err));
   }, [driverId]);
 
   if (loading) {
@@ -107,7 +130,15 @@ export const FeatureDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       case 'rto_locker':
         return <RtoLockerFeature driver={driver} />;
       case 'driver_safety':
-        return <DriverSafetyFeature driver={driver} />;
+        return (
+          <DriverSafetyFeature 
+            driver={driver} 
+            harshBrakes={dbHarshBrakes} 
+            harshCorners={dbHarshCorners} 
+            speeding={dbSpeeding} 
+            safetyScore={dbSafetyScore} 
+          />
+        );
       default:
         return (
           <View style={styles.contentCard}>
