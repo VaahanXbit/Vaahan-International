@@ -89,7 +89,7 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
             
             # Skip invalid placeholder coordinates (e.g. before GPS has acquired a satellite lock)
             if lat == 0.0 and lng == 0.0:
-                await websocket.send_json({"received": true})
+                await websocket.send_json({"received": True})
                 continue
                 
             speed_kmh = float(data.get("speed_kmh", 0.0))
