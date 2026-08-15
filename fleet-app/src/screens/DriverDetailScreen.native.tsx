@@ -324,7 +324,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                       <MaterialIcons name="local-shipping" size={20} color={theme.colors.onSurfaceVariant} />
                       <View style={styles.tripText}>
                         <Text style={[theme.typography.bodyMd, { color: theme.colors.onSurface, fontWeight: '500' }]}>
-                          Trip {trip.id.substring(0, 8).toUpperCase()} (Score: {trip.final_score !== null ? trip.final_score.toFixed(0) : 'N/A'})
+                          Trip {trip.id.substring(0, 8).toUpperCase()} (Score: {trip.final_score != null ? Number(trip.final_score).toFixed(0) : 'N/A'})
                         </Text>
                         <Text style={[theme.typography.labelCaps, { color: theme.colors.onSurfaceVariant, fontSize: 9, marginTop: 2 }]}>
                           {trip.start_time ? new Date(trip.start_time).toLocaleString() : 'N/A'}
@@ -332,7 +332,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                       </View>
                     </View>
                     <Text style={[theme.typography.bodyMd, { color: theme.colors.primary, fontWeight: '600' }]}>
-                      {trip.distance_km !== null ? `${parseFloat(trip.distance_km).toFixed(1)} km` : '0.0 km'}
+                      {trip.distance_km != null ? `${parseFloat(trip.distance_km).toFixed(1)} km` : '0.0 km'}
                     </Text>
                   </View>
                 ))
