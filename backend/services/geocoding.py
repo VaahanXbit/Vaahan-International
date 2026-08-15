@@ -1,4 +1,5 @@
 import time
+import os
 import httpx
 import logging
 import asyncio
@@ -36,31 +37,37 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
             logger.debug(f"Geocoding throttled for trip {trip_id}. Returning cached: {state['last_name']}")
             return state["last_name"]
 
-    # 2. Global Rate Limiter: Max 1 request per second globally
-    global_elapsed = now - last_global_api_call_time
-    if global_elapsed < 1.0:
-        # If we have a cached value for this trip, return it immediately to avoid stalling telemetry
-        if state and state["last_name"]:
-            logger.debug(f"Global limit hit. Returning cached name for trip {trip_id}: {state['last_name']}")
-            return state["last_name"]
-        
-        # If no cached value (e.g. first coordinate of a trip), pause execution to satisfy rate limit
-        wait_time = 1.0 - global_elapsed
-        logger.debug(f"Global limit hit. Sleeping {wait_time:.2f}s before Nominatim request")
-        await asyncio.sleep(wait_time)
-        now = time.time()
+    locationiq_key = os.getenv("LOCATIONIQ_API_KEY")
 
-    # Update global API timestamp
-    last_global_api_call_time = now
-    
-    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json"
-    headers = {
-        "User-Agent": "VaahanFleetApp/1.0 (contact: info@vaahan.com)"
-    }
-    
+    if not locationiq_key:
+        # 2. Global Rate Limiter (Only needed for free public Nominatim): Max 1 request per second globally
+        global_elapsed = now - last_global_api_call_time
+        if global_elapsed < 1.0:
+            # If we have a cached value for this trip, return it immediately to avoid stalling telemetry
+            if state and state["last_name"]:
+                logger.debug(f"Global limit hit. Returning cached name for trip {trip_id}: {state['last_name']}")
+                return state["last_name"]
+            
+            # If no cached value, pause execution to satisfy rate limit
+            wait_time = 1.0 - global_elapsed
+            logger.debug(f"Global limit hit. Sleeping {wait_time:.2f}s before Nominatim request")
+            await asyncio.sleep(wait_time)
+            now = time.time()
+
+        # Update global API timestamp
+        last_global_api_call_time = now
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json"
+        headers = {
+            "User-Agent": "VaahanFleetApp/1.0 (contact: info@vaahan.com)"
+        }
+    else:
+        # Query LocationIQ (no global 1s throttling required)
+        url = f"https://us1.locationiq.com/v1/reverse?key={locationiq_key}&lat={lat}&lon={lng}&format=json"
+        headers = None
+        
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
-            response = await client.get(url, headers=headers)
+            response = await client.get(url, headers=headers) if headers else await client.get(url)
             
             if response.status_code == 200:
                 data = response.json()
@@ -78,16 +85,18 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
                     val = address.get(key)
                     if val and val not in parts:
                         parts.append(val)
-                # 3. Add city/town and postal code
-                for key in ["city", "town", "village", "postcode"]:
+                # 3. Add city/town/county/state and postal code
+                for key in ["city", "town", "village", "county", "state", "postcode"]:
                     val = address.get(key)
                     if val and val not in parts:
                         parts.append(val)
                 
-                # Fallback to display_name snippet if address keys are missing
-                if not parts:
+                # Check if the generated parts list has too little detail (e.g., only postcode, or only 1 part)
+                has_geo = any(k in address for k in ["building", "amenity", "house_number", "road", "neighbourhood", "suburb", "city_district", "city", "town", "village", "county"])
+                if len(parts) < 2 or not has_geo:
                     display_name = data.get("display_name", "")
                     if display_name:
+                        # Extract first 4 segments of the formatted display name
                         parts = [p.strip() for p in display_name.split(",")[:4]]
                 
                 location_name = ", ".join(parts) if parts else "Locating..."
