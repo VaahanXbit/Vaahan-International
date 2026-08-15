@@ -22,6 +22,7 @@ import { RootStackParamList } from '../navigation/types';
 import theme from '../theme';
 import { getDriverDetail, Driver } from '../data/mockFleetData';
 import { MaterialIcons } from '@expo/vector-icons';
+import { api } from '../api/client';
 
 // Subcomponents separated according to feature/card component criteria
 import { LiveTripTrackerFeature } from '../components/LiveTripTrackerFeature';
