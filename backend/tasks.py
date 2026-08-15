@@ -175,8 +175,11 @@ def calculate_trip_scores_task(trip_id: str):
             GPSCoordinate.trip_id == trip_id
         ).order_by(GPSCoordinate.timestamp.asc()).all()
 
+        # Filter out invalid placeholder coordinates (0.0, 0.0) from calculations
+        coords = [c for c in coords if float(c.latitude) != 0.0 or float(c.longitude) != 0.0]
+
         if not coords:
-            logger.warning(f"No coordinates found for Trip {trip_id}. Cannot calculate scores.")
+            logger.warning(f"No valid coordinates found for Trip {trip_id}. Cannot calculate scores.")
             # Set default scores
             trip.final_score = 100.0
             session.commit()
