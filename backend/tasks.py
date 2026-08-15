@@ -146,6 +146,16 @@ def calculate_efficiency_score(
     )
 
 
+def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate the great-circle distance between two points in kilometers"""
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+
 def calculate_trip_scores_task(trip_id: str):
     """
     Async background task to calculate trip score, jerk events, and efficiency metrics
@@ -213,6 +223,14 @@ def calculate_trip_scores_task(trip_id: str):
         else:
             total_minutes = 0.0
 
+        # Calculate actual total distance dynamically using Haversine formula
+        total_distance_km = 0.0
+        for i in range(1, len(coords)):
+            total_distance_km += haversine_distance(
+                float(coords[i-1].latitude), float(coords[i-1].longitude),
+                float(coords[i].latitude), float(coords[i].longitude)
+            )
+
         # Calculate jerk values and search for extreme jerk events
         jerk_values = calculate_jerk_values(accel_readings_g, intervals)
         
@@ -269,8 +287,14 @@ def calculate_trip_scores_task(trip_id: str):
         trip.total_events = harsh_brake + harsh_corner + speeding + harsh_accel + extreme_jerk
         trip.notes = f"Scored asynchronously via Celery on {datetime.utcnow().isoformat()}"
         
+        # Self-healing: if the client sent 0 for distance/duration, update with actual values from logged coordinates
+        if not trip.distance_km or trip.distance_km == 0.0:
+            trip.distance_km = round(total_distance_km, 2)
+        if not trip.duration_minutes or trip.duration_minutes == 0:
+            trip.duration_minutes = max(1, int(round(total_minutes)))
+            
         session.commit()
-        logger.info(f"🏆 Background task finished: Trip {trip_id} updated with score {trip.final_score}")
+        logger.info(f"🏆 Background task finished: Trip {trip_id} updated with score {trip.final_score}, distance {trip.distance_km} km, duration {trip.duration_minutes} min")
         return True
 
     except Exception as e:
