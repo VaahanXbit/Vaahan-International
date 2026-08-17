@@ -14,7 +14,7 @@ export interface Driver {
   id: string;
   name: string;
   vehicleName: string;
-  efficiencyScore: number; // 0-100
+  efficiencyScore: number | string; // 0-100 or string description
   fuelLevel: number; // 0-100
   mileageDiff: number; // e.g. -1.2 or +18.0
   status: 'Active' | 'Idle' | 'Off-duty';
@@ -126,11 +126,13 @@ export const getDrivers = async (): Promise<Driver[]> => {
     return dbDrivers.map((d: any) => {
       // Find assigned vehicle
       const vehicle = dbVehicles.find((v: any) => v.driver_id === d.id) || null;
-      const vehicleName = vehicle ? `Truck #${vehicle.number}` : 'No Vehicle';
+      const vehicleName = vehicle ? `${vehicle.type || 'Truck'} #${vehicle.number}` : 'No Vehicle';
 
       // Find driver safety score
       const scoreObj = dbScores.find((s: any) => s.driver_id === d.id);
-      const efficiencyScore = scoreObj ? Math.round(scoreObj.score) : 75;
+      const efficiencyScore = scoreObj 
+        ? (typeof scoreObj.score === 'number' ? Math.round(scoreObj.score) : scoreObj.score)
+        : "Driver yet to take first ride";
 
       // Determine status
       const hasActiveTrip = activeTrips.some((t: any) => t.driver_id === d.id);

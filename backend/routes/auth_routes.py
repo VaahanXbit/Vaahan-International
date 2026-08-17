@@ -284,6 +284,7 @@ async def verify_driver(
     otp: str,
     name: str,
     vehicle_number: str,
+    vehicle_type: str = "truck",
     db: Session = Depends(get_db)
 ):
     """
@@ -352,15 +353,16 @@ async def verify_driver(
             vehicle = Vehicle(
                 company_id=company.id,
                 vehicle_number=vehicle_number,
-                vehicle_type="truck",
+                vehicle_type=vehicle_type,
                 status="active"
             )
             db.add(vehicle)
             db.commit()
             db.refresh(vehicle)
         else:
-            # Update vehicle company assignment
+            # Update vehicle company assignment and type
             vehicle.company_id = company.id
+            vehicle.vehicle_type = vehicle_type
             db.commit()
         
         if driver:
@@ -619,6 +621,7 @@ async def driver_direct(
     phone_number: str,
     name: str = None,
     vehicle_number: str = None,
+    vehicle_type: str = "truck",
     is_login: bool = False,
     db: Session = Depends(get_db)
 ):
@@ -687,7 +690,7 @@ async def driver_direct(
                 vehicle = Vehicle(
                     company_id=company.id,
                     vehicle_number=vehicle_number,
-                    vehicle_type="truck",
+                    vehicle_type=vehicle_type,
                     status="active"
                 )
                 db.add(vehicle)
@@ -697,6 +700,8 @@ async def driver_direct(
                 company = db.query(Company).filter(Company.id == vehicle.company_id).first()
                 if not company:
                     company = db.query(Company).filter(Company.name == "Independent Drivers").first()
+                vehicle.vehicle_type = vehicle_type
+                db.commit()
             
             driver = Driver(
                 phone_number=phone_number,

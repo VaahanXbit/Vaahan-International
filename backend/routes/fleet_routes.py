@@ -39,17 +39,51 @@ async def get_fleet_drivers(company_id: str, limit: int = 50, db: Session = Depe
 
 @router.get("/scores")
 async def get_all_scores(company_id: str, db: Session = Depends(get_db)):
-    """Get all drivers' scores for company"""
+    """Get all drivers' scores for company based on last 24h trips with dynamic fallbacks"""
     try:
-        yesterday = date.today() - timedelta(days=1)
-        scores = db.query(DailyScore).filter(
-            DailyScore.company_id == company_id,
-            DailyScore.date == yesterday
-        ).order_by(DailyScore.avg_score.desc()).all()
+        from models import Driver, Trip
+        from datetime import datetime, timedelta
         
+        drivers = db.query(Driver).filter(Driver.company_id == company_id).all()
+        scores = []
+        
+        for driver in drivers:
+            trips = db.query(Trip).filter(Trip.driver_id == driver.id).order_by(Trip.start_time.desc()).all()
+            if not trips:
+                scores.append({
+                    "driver_id": str(driver.id),
+                    "score": "Driver yet to take first ride"
+                })
+            else:
+                now = datetime.utcnow()
+                limit_24h = now - timedelta(hours=24)
+                trips_24h = [t for t in trips if t.start_time >= limit_24h]
+                
+                if trips_24h:
+                    # Calculate average score of all trips in that 24 hours
+                    valid_scores = [float(t.final_score) for t in trips_24h if t.final_score is not None]
+                    avg_score = sum(valid_scores) / len(valid_scores) if valid_scores else 100.0
+                    scores.append({
+                        "driver_id": str(driver.id),
+                        "score": avg_score
+                    })
+                else:
+                    # No trips in the last 24 hours: persist previous 24h window score
+                    # (average score of all trips in the 24-hour window ending at the most recent trip)
+                    most_recent_time = trips[0].start_time
+                    limit_recent_24h = most_recent_time - timedelta(hours=24)
+                    recent_window_trips = [t for t in trips if limit_recent_24h <= t.start_time <= most_recent_time]
+                    
+                    valid_scores = [float(t.final_score) for t in recent_window_trips if t.final_score is not None]
+                    avg_score = sum(valid_scores) / len(valid_scores) if valid_scores else 100.0
+                    scores.append({
+                        "driver_id": str(driver.id),
+                        "score": avg_score
+                    })
+                    
         return {
             "status": "success",
-            "scores": [{"driver_id": str(s.driver_id), "score": float(s.avg_score or 0)} for s in scores]
+            "scores": scores
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to get scores")
@@ -65,6 +99,7 @@ async def get_fleet_vehicles(company_id: str, db: Session = Depends(get_db)):
                 {
                     "id": str(v.id),
                     "number": v.vehicle_number,
+                    "type": v.vehicle_type,
                     "fastag_id": v.fastag_id,
                     "fastag_balance": float(v.fastag_balance or 0),
                     "driver_id": str(v.driver_id) if v.driver_id else None

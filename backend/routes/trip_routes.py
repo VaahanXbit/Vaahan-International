@@ -180,7 +180,16 @@ async def list_trips(driver_id: str, limit: int = 20, db: Session = Depends(get_
         trips = db.query(Trip).filter(Trip.driver_id == driver_id).order_by(Trip.start_time.desc()).limit(limit).all()
         return {
             "status": "success",
-            "trips": [{"id": str(t.id), "status": t.status} for t in trips]
+            "trips": [
+                {
+                    "id": str(t.id),
+                    "status": t.status,
+                    "start_time": t.start_time.isoformat() if t.start_time else None,
+                    "distance_km": float(t.distance_km or 0),
+                    "final_score": float(t.final_score) if t.final_score is not None else None
+                }
+                for t in trips
+            ]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to list trips")

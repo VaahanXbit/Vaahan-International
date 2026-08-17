@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import theme from '../theme';
 import { getDriverDetail, deleteDriver, Driver } from '../data/mockFleetData';
 import { Gauge } from '../components/Gauge';
 import { TelemetryChart } from '../components/TelemetryChart';
-import { AddDriverModal } from '../components/AddDriverModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -63,7 +62,6 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { driverId } = route.params;
   const [driver, setDriver] = useState<Driver | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [gpsPoints, setGpsPoints] = useState<{ lat: number; lng: number; timestamp: string }[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
@@ -229,10 +227,6 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
-  const handleEditPress = () => {
-    setEditModalOpen(true);
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={styles.centerContainer}>
@@ -276,56 +270,21 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.profileCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>
-              {driver.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-            </Text>
-          </View>
-          <Text style={[theme.typography.headlineMd, styles.profileName]}>
+        <View style={styles.profileHeaderRow}>
+          <Text style={[theme.typography.headlineMd, { color: theme.colors.onSurface, fontWeight: '700' }]}>
             {driver.name}
           </Text>
-          <Text style={[theme.typography.labelCaps, styles.profileSubtext]}>
-            {driver.vehicleName}
+          <Text style={[theme.typography.bodyMd, { color: theme.colors.onSurfaceVariant, marginLeft: 8 }]}>
+            ({driver.vehicleName})
           </Text>
-
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
-              <MaterialIcons name="edit" size={16} color={theme.colors.onPrimary} style={{ marginRight: 6 }} />
-              <Text style={styles.editButtonText}>EDIT PROFILE</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
-        <View style={styles.tabSelector}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 0 && styles.tabButtonActive]}
-            onPress={() => setActiveTab(0)}
-          >
-            <Text style={[styles.tabButtonText, activeTab === 0 && styles.tabButtonTextActive]}>
-              LIVE TRIP
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 1 && styles.tabButtonActive]}
-            onPress={() => setActiveTab(1)}
-          >
-            <Text style={[styles.tabButtonText, activeTab === 1 && styles.tabButtonTextActive]}>
-              SAFETY PROFILE
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 2 && styles.tabButtonActive]}
-            onPress={() => setActiveTab(2)}
-          >
-            <Text style={[styles.tabButtonText, activeTab === 2 && styles.tabButtonTextActive]}>
-              FASTAG MONITOR
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeTab === 0 && (
+        {driver.enabledProducts.includes('live_trip_tracker') && (
           <>
+            <View style={styles.sectionHeader}>
+              <Text style={[theme.typography.labelCaps, styles.sectionTitle]}>RECENT TRIPS</Text>
+            </View>
+
             <TouchableOpacity
               onPress={() => navigation.navigate('FeatureDetail', { feature: 'live_trip_tracker', driverId: driver.id })}
               activeOpacity={0.8}
@@ -417,7 +376,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             activeOpacity={0.8}
           >
             <Gauge
-              value={driver.efficiencyScore}
+              value={typeof driver.efficiencyScore === 'number' ? driver.efficiencyScore : 0}
               displayValue={`${driver.efficiencyScore}`}
               labelText="Efficiency Score"
               size="lg"
@@ -541,15 +500,6 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         )}
       </ScrollView>
 
-      {/* Edit Driver Modal */}
-      <AddDriverModal
-        visible={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        onDriverAdded={() => setRefreshTrigger(prev => prev + 1)}
-        editDriverId={driver.id}
-        initialName={driver.name}
-        initialVehicle={driver.vehicleName}
-      />
     </SafeAreaView>
   );
 };
@@ -591,6 +541,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+  },
+  profileHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 20,
   },
   gaugeCard: {
     backgroundColor: theme.colors.surfaceContainer,

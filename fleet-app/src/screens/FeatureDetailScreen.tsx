@@ -40,7 +40,7 @@ export const FeatureDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [dbHarshBrakes, setDbHarshBrakes] = useState(0);
   const [dbHarshCorners, setDbHarshCorners] = useState(0);
   const [dbSpeeding, setDbSpeeding] = useState(0);
-  const [dbSafetyScore, setDbSafetyScore] = useState<number | undefined>(undefined);
+  const [dbSafetyScore, setDbSafetyScore] = useState<number | string | undefined>(undefined);
 
   useEffect(() => {
     getDriverDetail(driverId).then(data => {
@@ -56,12 +56,35 @@ export const FeatureDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             const totalBrakes = completedOnly.reduce((sum: number, t: any) => sum + (t.harsh_brake_count || 0), 0);
             const totalCorners = completedOnly.reduce((sum: number, t: any) => sum + (t.harsh_corner_count || 0), 0);
             const totalSpeeding = completedOnly.reduce((sum: number, t: any) => sum + (t.speeding_count || 0), 0);
-            const avgScore = completedOnly.reduce((sum: number, t: any) => sum + (t.final_score || 100), 0) / completedOnly.length;
+
+            // Compute score based on last 24 hours trips
+            const now = new Date();
+            const limit24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const trips24h = completedOnly.filter((t: any) => t.start_time && new Date(t.start_time) >= limit24h);
+
+            let avgScore: number | string = 100;
+            if (trips24h.length > 0) {
+              const validScores = trips24h.map((t: any) => t.final_score !== null ? parseFloat(t.final_score) : 100);
+              avgScore = validScores.reduce((sum: number, s: number) => sum + s, 0) / validScores.length;
+            } else {
+              // Persist previous 24h window (ending at the most recent trip)
+              const sortedTrips = [...completedOnly].sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+              const mostRecentTime = new Date(sortedTrips[0].start_time);
+              const limitRecent24h = new Date(mostRecentTime.getTime() - 24 * 60 * 60 * 1000);
+              const recentWindowTrips = completedOnly.filter((t: any) => t.start_time && new Date(t.start_time) >= limitRecent24h && new Date(t.start_time) <= mostRecentTime);
+              const validScores = recentWindowTrips.map((t: any) => t.final_score !== null ? parseFloat(t.final_score) : 100);
+              avgScore = validScores.reduce((sum: number, s: number) => sum + s, 0) / validScores.length;
+            }
 
             setDbHarshBrakes(totalBrakes);
             setDbHarshCorners(totalCorners);
             setDbSpeeding(totalSpeeding);
             setDbSafetyScore(avgScore);
+          } else {
+            setDbHarshBrakes(0);
+            setDbHarshCorners(0);
+            setDbSpeeding(0);
+            setDbSafetyScore("Driver yet to take first ride");
           }
         }
       })

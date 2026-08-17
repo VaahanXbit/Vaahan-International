@@ -56,6 +56,7 @@ interface VaahanApi {
         @Query("phone_number") phoneNumber: String,
         @Query("name") name: String? = null,
         @Query("vehicle_number") vehicleNumber: String? = null,
+        @Query("vehicle_type") vehicleType: String? = null,
         @Query("is_login") isLogin: Boolean
     ): Response<DriverResponse>
 
@@ -64,7 +65,8 @@ interface VaahanApi {
         @Query("phone_number") phoneNumber: String,
         @Query("otp") otp: String,
         @Query("name") name: String,
-        @Query("vehicle_number") vehicleNumber: String
+        @Query("vehicle_number") vehicleNumber: String,
+        @Query("vehicle_type") vehicleType: String? = null
     ): Response<DriverResponse>
 
     @POST("auth/disconnect-driver")

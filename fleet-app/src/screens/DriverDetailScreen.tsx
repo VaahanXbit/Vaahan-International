@@ -357,7 +357,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             activeOpacity={0.8}
           >
             <Gauge
-              value={driver.efficiencyScore}
+              value={typeof driver.efficiencyScore === 'number' ? driver.efficiencyScore : 0}
               displayValue={`${driver.efficiencyScore}`}
               labelText="Efficiency Score"
               size="lg"

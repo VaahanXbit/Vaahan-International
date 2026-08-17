@@ -22,13 +22,14 @@ export const Gauge: React.FC<GaugeProps> = ({
   thresholds = { red: 50, amber: 75 },
 }) => {
   // Clamp value between 0 and 100 for display arc
-  const clampedVal = Math.min(100, Math.max(0, value));
+  const numericValue = typeof value === 'number' && !isNaN(value) ? value : 0;
+  const clampedVal = Math.min(100, Math.max(0, numericValue));
 
   // Determine color based on thresholds
   let strokeColor: string = theme.colors.primary; // Green/Primary by default
-  if (value < thresholds.red) {
+  if (numericValue < thresholds.red) {
     strokeColor = theme.colors.error; // Red
-  } else if (value <= thresholds.amber) {
+  } else if (numericValue <= thresholds.amber) {
     strokeColor = '#d97706'; // Amber / Orange
   }
 
@@ -69,16 +70,19 @@ export const Gauge: React.FC<GaugeProps> = ({
         </Svg>
 
         {/* Centered text display */}
-        <View style={isLg ? styles.lgTextOverlay : styles.smTextOverlay}>
-          <Text style={[
-            isLg ? theme.typography.metricLg : theme.typography.headlineMd,
-            { color: theme.colors.onSurface, fontWeight: '700' }
-          ]}>
+        <View style={[isLg ? styles.lgTextOverlay : styles.smTextOverlay, { left: 10, right: 10, justifyContent: 'center' }]}>
+          <Text 
+            style={[
+              isLg ? theme.typography.metricLg : theme.typography.headlineMd,
+              { color: theme.colors.onSurface, fontWeight: '700', fontSize: isLg ? (displayValue.length <= 6 ? 32 : 11) : (displayValue.length <= 6 ? 18 : 8), textAlign: 'center' }
+            ]}
+            numberOfLines={2}
+          >
             {displayValue}
           </Text>
           <Text style={[
             theme.typography.labelCaps,
-            { color: theme.colors.onSurfaceVariant, textTransform: 'uppercase', marginTop: 2 }
+            { color: theme.colors.onSurfaceVariant, textTransform: 'uppercase', marginTop: 2, textAlign: 'center', fontSize: isLg ? 10 : 8 }
           ]}>
             {labelText}
           </Text>
