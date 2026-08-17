@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
+fun ProfileScreen(onNavigateBack: () -> Unit, onJoinFleet: () -> Unit, onLogout: () -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val sharedPref = remember { context.getSharedPreferences("vaahan_prefs", Context.MODE_PRIVATE) }
@@ -219,8 +219,7 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onLogout: () -> Unit) {
                         // JOIN FLEET Button (Green background) - Only shown when disconnected
                         Button(
                             onClick = {
-                                // Close profile and go back to dashboard to prompt fleet onboarding
-                                onNavigateBack()
+                                onJoinFleet()
                             },
                             modifier = Modifier
                                 .fillMaxWidth()

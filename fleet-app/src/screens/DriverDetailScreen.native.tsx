@@ -69,6 +69,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [liveSpeed, setLiveSpeed] = useState<number>(0);
   const [completedTrips, setCompletedTrips] = useState<any[]>([]);
+  const mapRef = useRef<MapView>(null);
 
   const companyCity = useSelector((state: any) => state.auth.user?.city);
   const lowercaseCity = (companyCity || 'bangalore').trim().toLowerCase();
@@ -184,11 +185,22 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     ws.onclose = () => {
       console.log('WS Connection closed');
     };
-
     return () => {
       ws.close();
     };
   }, [activeTripId]);
+
+  useEffect(() => {
+    if (hasGpsData && mapRef.current) {
+      const lastPoint = gpsPoints[gpsPoints.length - 1];
+      mapRef.current.animateToRegion({
+        latitude: lastPoint.lat,
+        longitude: lastPoint.lng,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      }, 1000);
+    }
+  }, [gpsPoints]);
 
   const handleDeletePress = () => {
     Alert.alert(
@@ -200,16 +212,25 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            // TODO(backend): Call backend DELETE /driver/{id} instead of local state only.
-            await deleteDriver(driverId);
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Dashboard' }],
-            });
+            try {
+              setLoading(true);
+              const res = await deleteDriver(driverId);
+              if (res) {
+                Alert.alert('Success', 'Driver deleted successfully.');
+                navigation.goBack();
+              }
+            } catch (e) {
+              setLoading(false);
+              Alert.alert('Error', 'Failed to delete driver.');
+            }
           }
         }
       ]
     );
+  };
+
+  const handleEditPress = () => {
+    setEditModalOpen(true);
   };
 
   if (loading) {
@@ -232,7 +253,6 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Custom Top App Bar */}
       <View style={styles.appBar}>
         <TouchableOpacity
           style={styles.appBarButton}
@@ -243,28 +263,69 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         </TouchableOpacity>
 
         <Text style={[theme.typography.headlineMd, styles.appBarTitle]}>
-          {driver.name}
+          DRIVER PROFILE
         </Text>
 
-        <View style={styles.appBarActions}>
-          <TouchableOpacity
-            style={styles.appBarButton}
-            onPress={handleDeletePress}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="delete-outline" size={22} color={theme.colors.error} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.appBarButton}
+          onPress={handleDeletePress}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="delete-forever" size={24} color={theme.colors.error} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Recent Trips Log */}
-        {driver.enabledProducts.includes('live_trip_tracker') && (
-          <>
-            <View style={styles.sectionHeader}>
-              <Text style={[theme.typography.labelCaps, styles.sectionTitle]}>RECENT TRIPS</Text>
-            </View>
+        <View style={styles.profileCard}>
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>
+              {driver.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+            </Text>
+          </View>
+          <Text style={[theme.typography.headlineMd, styles.profileName]}>
+            {driver.name}
+          </Text>
+          <Text style={[theme.typography.labelCaps, styles.profileSubtext]}>
+            {driver.vehicleName}
+          </Text>
 
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.editButton} onPress={handleEditPress}>
+              <MaterialIcons name="edit" size={16} color={theme.colors.onPrimary} style={{ marginRight: 6 }} />
+              <Text style={styles.editButtonText}>EDIT PROFILE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.tabSelector}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 0 && styles.tabButtonActive]}
+            onPress={() => setActiveTab(0)}
+          >
+            <Text style={[styles.tabButtonText, activeTab === 0 && styles.tabButtonTextActive]}>
+              LIVE TRIP
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 1 && styles.tabButtonActive]}
+            onPress={() => setActiveTab(1)}
+          >
+            <Text style={[styles.tabButtonText, activeTab === 1 && styles.tabButtonTextActive]}>
+              SAFETY PROFILE
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 2 && styles.tabButtonActive]}
+            onPress={() => setActiveTab(2)}
+          >
+            <Text style={[styles.tabButtonText, activeTab === 2 && styles.tabButtonTextActive]}>
+              FASTAG MONITOR
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === 0 && (
+          <>
             <TouchableOpacity
               onPress={() => navigation.navigate('FeatureDetail', { feature: 'live_trip_tracker', driverId: driver.id })}
               activeOpacity={0.8}
@@ -272,6 +333,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             >
               <View style={styles.mapWrapper}>
                 <MapView
+                  ref={mapRef}
                   style={styles.map}
                   initialRegion={initialRegion}
                   customMapStyle={darkMapStyle}

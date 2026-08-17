@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -20,6 +20,7 @@ const CITY_COORDINATES: { [key: string]: { latitude: number; longitude: number }
 export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
   const { startTrackingTrip, getTelemetryState, setInitialTelemetry } = useTelemetry();
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
+  const mapRef = useRef<MapView>(null);
 
   const telemetryState = activeTripId ? getTelemetryState(activeTripId) : {
     gpsPoints: [],
@@ -106,6 +107,18 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
     };
   }, [driver.id]);
 
+  useEffect(() => {
+    if (hasGpsData && mapRef.current) {
+      const lastPoint = gpsPoints[gpsPoints.length - 1];
+      mapRef.current.animateToRegion({
+        latitude: lastPoint.lat,
+        longitude: lastPoint.lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 1000);
+    }
+  }, [gpsPoints]);
+
   if (!activeTripId) {
     return (
       <View style={styles.noTripContainer}>
@@ -121,6 +134,7 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
       {/* Map View Wrapper */}
       <View style={styles.mapWrapper}>
         <MapView
+          ref={mapRef}
           style={styles.map}
           initialRegion={initialRegion}
           showsUserLocation={false}

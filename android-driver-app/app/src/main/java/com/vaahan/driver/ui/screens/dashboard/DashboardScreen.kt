@@ -45,7 +45,9 @@ enum class OnboardingStage {
 @Composable
 fun DashboardScreen(
     onNavigateToProfile: () -> Unit,
-    onNavigateToActiveTrip: (String) -> Unit
+    onNavigateToActiveTrip: (String) -> Unit,
+    startOnboarding: Boolean = false,
+    onOnboardingStarted: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -62,6 +64,13 @@ fun DashboardScreen(
             else 
                 OnboardingStage.NONE
         ) 
+    }
+
+    LaunchedEffect(startOnboarding) {
+        if (startOnboarding) {
+            onboardingStage = OnboardingStage.ENTER_OTP
+            onOnboardingStarted()
+        }
     }
 
     var selectedTab by remember { mutableStateOf(0) }

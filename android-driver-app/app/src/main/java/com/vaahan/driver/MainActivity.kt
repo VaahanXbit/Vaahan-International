@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(if (savedDriverId != null) Screen.DASHBOARD else Screen.LOGIN) 
                 }
                 var currentTripId by remember { mutableStateOf<String?>(null) }
+                var startOnboarding by remember { mutableStateOf(false) }
 
                 when (currentScreen) {
                     Screen.LOGIN -> LoginScreen(onNavigateToDashboard = { currentScreen = Screen.DASHBOARD })
@@ -45,10 +46,16 @@ class MainActivity : ComponentActivity() {
                         onNavigateToActiveTrip = { tripId ->
                             currentTripId = tripId
                             currentScreen = Screen.ACTIVE_TRIP
-                        }
+                        },
+                        startOnboarding = startOnboarding,
+                        onOnboardingStarted = { startOnboarding = false }
                     )
                     Screen.PROFILE -> ProfileScreen(
                         onNavigateBack = { currentScreen = Screen.DASHBOARD },
+                        onJoinFleet = {
+                            startOnboarding = true
+                            currentScreen = Screen.DASHBOARD
+                        },
                         onLogout = { currentScreen = Screen.LOGIN }
                     )
                     Screen.ACTIVE_TRIP -> {
