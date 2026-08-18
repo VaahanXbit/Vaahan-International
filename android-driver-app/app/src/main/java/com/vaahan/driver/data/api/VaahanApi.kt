@@ -14,6 +14,7 @@ data class DriverResponse(
     val name: String?,
     val phone_number: String?,
     val vehicle_number: String?,
+    val vehicle_type: String?,
     val company_name: String?,
     val access_token: String?,
     val refresh_token: String?

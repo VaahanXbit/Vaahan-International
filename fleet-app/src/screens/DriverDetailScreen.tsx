@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import theme from '../theme';
-import { getDriverDetail, deleteDriver, Driver } from '../data/mockFleetData';
+import { getDriverDetail, Driver } from '../data/mockFleetData';
 import { Gauge } from '../components/Gauge';
 import { TelemetryChart } from '../components/TelemetryChart';
 import { AddDriverModal } from '../components/AddDriverModal';
@@ -214,27 +214,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     };
   }, [activeTripId]);
 
-  const handleDeletePress = () => {
-    Alert.alert(
-      'Delete Driver',
-      "Delete this driver? This can't be undone.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            // TODO(backend): Call backend DELETE /driver/{id} instead of local state only.
-            await deleteDriver(driverId);
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Dashboard' }],
-            });
-          }
-        }
-      ]
-    );
-  };
+
 
   if (loading) {
     return (
@@ -271,13 +251,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         </Text>
 
         <View style={styles.appBarActions}>
-          <TouchableOpacity
-            style={styles.appBarButton}
-            onPress={handleDeletePress}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="delete-outline" size={22} color={theme.colors.error} />
-          </TouchableOpacity>
+          <View style={{ width: 40 }} />
         </View>
       </View>
 

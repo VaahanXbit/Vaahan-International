@@ -38,14 +38,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsBike
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.AirportShuttle
-import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material3.Icon
+import com.vaahan.driver.R
 import com.vaahan.driver.data.api.RetrofitClient
 import com.vaahan.driver.ui.components.PrimaryButton
 import com.vaahan.driver.ui.theme.Background
@@ -59,7 +55,7 @@ import kotlinx.coroutines.launch
 data class VehicleOption(
     val id: String,
     val label: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector
+    val imageRes: Int
 )
 
 @Composable
@@ -77,14 +73,14 @@ fun LoginScreen(onNavigateToDashboard: () -> Unit) {
 
     val vehicleOptions = remember {
         listOf(
-            VehicleOption("Bike", "Bike", Icons.Default.DirectionsBike),
-            VehicleOption("Auto", "Auto", Icons.Default.DirectionsCar),
-            VehicleOption("Car", "Car", Icons.Default.DirectionsCar),
-            VehicleOption("Van", "Van", Icons.Default.AirportShuttle),
-            VehicleOption("Bus", "Bus", Icons.Default.DirectionsBus),
-            VehicleOption("Mini Truck (SCV)", "Mini Truck (SCV)", Icons.Default.LocalShipping),
-            VehicleOption("Pickup Truck (LCV)", "Pickup Truck (LCV)", Icons.Default.LocalShipping),
-            VehicleOption("Truck (HCV)", "Truck (HCV)", Icons.Default.LocalShipping)
+            VehicleOption("Bike", "Bike", R.drawable.vehicle_bike),
+            VehicleOption("Auto", "Auto", R.drawable.vehicle_auto),
+            VehicleOption("Car", "Car", R.drawable.vehicle_car),
+            VehicleOption("Van", "Van", R.drawable.vehicle_van),
+            VehicleOption("Bus", "Bus", R.drawable.vehicle_bus),
+            VehicleOption("Mini Truck (SCV)", "Mini Truck (SCV)", R.drawable.vehicle_mini_truck),
+            VehicleOption("Pickup Truck (LCV)", "Pickup Truck (LCV)", R.drawable.vehicle_pickup),
+            VehicleOption("Truck (HCV)", "Truck (HCV)", R.drawable.vehicle_truck)
         )
     }
 
@@ -290,11 +286,10 @@ fun LoginScreen(onNavigateToDashboard: () -> Unit) {
                                                         .padding(vertical = 8.dp, horizontal = 2.dp),
                                                     horizontalAlignment = Alignment.CenterHorizontally
                                                 ) {
-                                                    Icon(
-                                                        imageVector = option.icon,
+                                                    Image(
+                                                        painter = painterResource(id = option.imageRes),
                                                         contentDescription = option.label,
-                                                        tint = if (isSelected) PrimaryGreen else TextSecondary,
-                                                        modifier = Modifier.size(20.dp)
+                                                        modifier = Modifier.size(40.dp)
                                                     )
                                                     Spacer(modifier = Modifier.height(4.dp))
                                                     Text(
@@ -390,6 +385,7 @@ fun LoginScreen(onNavigateToDashboard: () -> Unit) {
                                             putString("driver_name", body.name)
                                             putString("phone_number", body.phone_number)
                                             putString("vehicle_number", body.vehicle_number)
+                                            putString("vehicle_type", body.vehicle_type)
                                             putString("company_name", body.company_name)
                                             putString("access_token", body.access_token)
                                             putBoolean("has_shown_fleet_onboard", false)

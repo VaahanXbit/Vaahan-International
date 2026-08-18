@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import theme from '../theme';
-import { getDriverDetail, deleteDriver, Driver } from '../data/mockFleetData';
+import { getDriverDetail, Driver } from '../data/mockFleetData';
 import { Gauge } from '../components/Gauge';
 import { TelemetryChart } from '../components/TelemetryChart';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -200,32 +200,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [gpsPoints]);
 
-  const handleDeletePress = () => {
-    Alert.alert(
-      'Delete Driver',
-      "Delete this driver? This can't be undone.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              const res = await deleteDriver(driverId);
-              if (res) {
-                Alert.alert('Success', 'Driver deleted successfully.');
-                navigation.goBack();
-              }
-            } catch (e) {
-              setLoading(false);
-              Alert.alert('Error', 'Failed to delete driver.');
-            }
-          }
-        }
-      ]
-    );
-  };
+
 
   if (loading) {
     return (
@@ -260,13 +235,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           DRIVER PROFILE
         </Text>
 
-        <TouchableOpacity
-          style={styles.appBarButton}
-          onPress={handleDeletePress}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="delete-forever" size={24} color={theme.colors.error} />
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

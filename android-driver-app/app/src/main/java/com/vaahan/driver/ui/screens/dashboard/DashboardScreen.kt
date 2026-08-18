@@ -44,8 +44,12 @@ enum class OnboardingStage {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
+    viewModel: com.vaahan.driver.TripViewModel,
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToActiveTrip: (String) -> Unit,
+    onNavigateToSummary: (String) -> Unit,
     startOnboarding: Boolean = false,
     onOnboardingStarted: () -> Unit = {}
 ) {
@@ -73,8 +77,6 @@ fun DashboardScreen(
         }
     }
 
-    var selectedTab by remember { mutableStateOf(0) }
-
     // Focus requesters and digits for 6-digit OTP fields
     val focusRequesters = remember { List(6) { FocusRequester() } }
     val otpDigits = remember { mutableStateListOf("", "", "", "", "", "") }
@@ -87,7 +89,7 @@ fun DashboardScreen(
             ) {
                 NavigationBarItem(
                     selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    onClick = { onTabSelected(0) },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.Home,
@@ -105,7 +107,7 @@ fun DashboardScreen(
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
+                    onClick = { onTabSelected(1) },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.Description,
@@ -123,7 +125,7 @@ fun DashboardScreen(
                 )
                 NavigationBarItem(
                     selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
+                    onClick = { onTabSelected(2) },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.CreditCard,
@@ -387,154 +389,147 @@ fun DashboardScreen(
         // Tab Content Router
         when (selectedTab) {
             0 -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Background)
-                        .padding(innerPadding)
-                        .padding(horizontal = Spacing.lg),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Header bar with FleetSync title and Profile icon on the right
-                    Row(
+                if (viewModel.isTripActive && !viewModel.isTripMinimized) {
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Spacing.md),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxSize()
+                            .padding(innerPadding)
                     ) {
+                        com.vaahan.driver.ui.screens.trip.ActiveTripScreen(
+                            tripId = viewModel.currentTripId ?: "",
+                            viewModel = viewModel,
+                            onNavigateToSummary = onNavigateToSummary,
+                            onMinimize = {
+                                viewModel.isTripMinimized = true
+                            }
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Background)
+                            .padding(innerPadding)
+                            .padding(horizontal = Spacing.lg),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Header bar with FleetSync title and Profile icon on the right
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.md),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "FleetSync",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 20.sp,
+                                color = TextPrimary
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(Color.White, CircleShape)
+                                    .clickable { onNavigateToProfile() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Profile",
+                                    tint = PrimaryGreen,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+
+                        // Company Connected Banner
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.sm),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(Spacing.md),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(PrimaryGreen, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(Spacing.sm))
+                                Text(
+                                    text = "PORT CONNECTED: ${currentCompanyName.uppercase()}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryGreen
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(Spacing.md))
+
+                        // Large Hero Heading
                         Text(
-                            text = "FleetSync",
+                            text = "FLEET MANAGEMENT",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextSecondary,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "DRIVER PORTAL",
+                            fontSize = 28.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 20.sp,
                             color = TextPrimary
                         )
 
-                        Box(
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    try {
+                                        val driverId = sharedPref.getString("driver_id", "") ?: ""
+                                        if (driverId.isEmpty()) {
+                                            Toast.makeText(context, "Driver profile not found. Please log in again.", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+                                        val response = RetrofitClient.api.startTrip(driverId)
+                                        if (response.isSuccessful && response.body()?.status == "success") {
+                                            val tripId = response.body()?.trip_id ?: ""
+                                            onNavigateToActiveTrip(tripId)
+                                        } else {
+                                            Toast.makeText(context, "Failed to start trip: ${response.message()}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Connection error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
                             modifier = Modifier
-                                .size(40.dp)
-                                .background(Color.White, CircleShape)
-                                .clickable { onNavigateToProfile() },
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006E44)),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                tint = TextSecondary
+                            Text(
+                                text = "START TRIP",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
                             )
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Status Indicator Chip (Dynamic based on connection)
-                    if (currentCompanyName == "Independent Drivers") {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(Color(0xFFD97706), CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "NOT CONNECTED TO ANY FLEET",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFFD97706)
-                                )
-                            }
-                        }
-                    } else {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFDCFCE7)),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(Color(0xFF16A34A), CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "PORT CONNECTED: ${currentCompanyName.uppercase()}",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF15803D)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "FLEET MANAGEMENT",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextSecondary,
-                        letterSpacing = 1.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "DRIVER PORTAL",
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TextPrimary,
-                        letterSpacing = 0.5.sp
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                try {
-                                    val driverId = sharedPref.getString("driver_id", "") ?: ""
-                                    if (driverId.isEmpty()) {
-                                        Toast.makeText(context, "Driver profile not found. Please log in again.", Toast.LENGTH_SHORT).show()
-                                        return@launch
-                                    }
-                                    val response = RetrofitClient.api.startTrip(driverId)
-                                    if (response.isSuccessful && response.body()?.status == "success") {
-                                        val tripId = response.body()?.trip_id ?: ""
-                                        onNavigateToActiveTrip(tripId)
-                                    } else {
-                                        Toast.makeText(context, "Failed to start trip: ${response.message()}", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Connection error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006E44)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            text = "START TRIP",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
             1 -> {

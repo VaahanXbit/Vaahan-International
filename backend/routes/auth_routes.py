@@ -406,6 +406,8 @@ async def verify_driver(
             "driver_id": str(driver.id),
             "name": driver.name,
             "phone_number": driver.phone_number,
+            "vehicle_number": vehicle.vehicle_number if vehicle else None,
+            "vehicle_type": vehicle.vehicle_type if vehicle else None,
             "company_name": company.name,
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -654,6 +656,7 @@ async def driver_direct(
                 "name": driver.name,
                 "phone_number": driver.phone_number,
                 "vehicle_number": vehicle_num,
+                "vehicle_type": vehicle.vehicle_type if vehicle else "truck",
                 "company_name": company_name,
                 "access_token": access_token,
                 "refresh_token": refresh_token
@@ -726,6 +729,7 @@ async def driver_direct(
                 "name": driver.name,
                 "phone_number": driver.phone_number,
                 "vehicle_number": vehicle_number,
+                "vehicle_type": vehicle_type,
                 "company_name": company.name if company else "Independent Drivers",
                 "access_token": access_token,
                 "refresh_token": refresh_token

@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,7 +42,9 @@ import kotlin.math.roundToInt
 @Composable
 fun ActiveTripScreen(
     tripId: String,
-    onNavigateToSummary: (String) -> Unit
+    viewModel: com.vaahan.driver.TripViewModel,
+    onNavigateToSummary: (String) -> Unit,
+    onMinimize: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -55,6 +58,11 @@ fun ActiveTripScreen(
     val harshCorners by TelemetryState.harshCorners.collectAsState()
     val speeding by TelemetryState.speeding.collectAsState()
     val isConnected by TelemetryState.isConnected.collectAsState()
+
+    // Intercept system back click to minimize trip
+    androidx.activity.compose.BackHandler(enabled = true) {
+        onMinimize()
+    }
 
     // Sliding button properties
     var slideOffset by remember { mutableStateOf(0f) }
@@ -82,8 +90,12 @@ fun ActiveTripScreen(
         }
     )
 
-    // Launch Background Telemetry Service
+    // Launch Background Telemetry Service and setup shared state
     LaunchedEffect(tripId) {
+        viewModel.isTripActive = true
+        viewModel.isTripMinimized = false
+        viewModel.currentTripId = tripId
+
         val permissionsToRequest = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
@@ -122,14 +134,29 @@ fun ActiveTripScreen(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "ACTIVE TRIP",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                letterSpacing = 1.sp,
-                modifier = Modifier.padding(top = 16.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { onMinimize() }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.Black
+                    )
+                }
+                Text(
+                    text = "ACTIVE TRIP",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    letterSpacing = 1.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f).padding(end = 48.dp)
+                )
+            }
 
             Text(
                 text = "#$tripId",
@@ -337,6 +364,8 @@ fun ActiveTripScreen(
                                             context.stopService(Intent(context, TelemetryService::class.java))
                                             val response = RetrofitClient.api.endTrip(tripId, 0.0, 0)
                                             if (response.isSuccessful) {
+                                                viewModel.isTripActive = false
+                                                viewModel.isTripMinimized = false
                                                 onNavigateToSummary(tripId)
                                             } else {
                                                 Toast.makeText(context, "Failed to end trip: ${response.message()}", Toast.LENGTH_SHORT).show()

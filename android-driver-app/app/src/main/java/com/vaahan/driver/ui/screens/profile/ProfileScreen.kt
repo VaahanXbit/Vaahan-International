@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,6 +43,8 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onJoinFleet: () -> Unit, onLogout:
     val driverName = remember { sharedPref.getString("driver_name", "Driver Name") ?: "Driver Name" }
     val phoneNumber = remember { sharedPref.getString("phone_number", "") ?: "" }
     val initialCompanyName = remember { sharedPref.getString("company_name", "Independent Drivers") ?: "Independent Drivers" }
+    val vehicleNumber = remember { sharedPref.getString("vehicle_number", "") ?: "" }
+    val vehicleType = remember { sharedPref.getString("vehicle_type", "") ?: "" }
     
     var currentCompanyName by remember { mutableStateOf(initialCompanyName) }
     var isLoading by remember { mutableStateOf(false) }
@@ -138,6 +141,28 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onJoinFleet: () -> Unit, onLogout:
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         )
+                    }
+
+                    if (vehicleNumber.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DirectionsCar,
+                                contentDescription = "Vehicle",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (vehicleType.isNotEmpty()) "$vehicleType • $vehicleNumber" else vehicleNumber,
+                                color = TextSecondary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(28.dp))

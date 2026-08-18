@@ -243,11 +243,3 @@ export const updateDriver = async (driverId: string, name: string, vehicleName: 
   return null;
 };
 
-export const deleteDriver = async (driverId: string): Promise<void> => {
-  localActivities.unshift({
-    id: `act-del-${driverId}`,
-    message: `Driver ID ${driverId} was removed from the fleet`,
-    timestamp: 'Just now',
-    type: 'warning'
-  });
-};
