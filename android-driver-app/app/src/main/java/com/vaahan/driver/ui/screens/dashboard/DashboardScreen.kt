@@ -128,7 +128,7 @@ fun DashboardScreen(
                     onClick = { onTabSelected(2) },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.AccountBalanceWallet,
+                            imageVector = Icons.Default.CreditCard,
                             contentDescription = "Fastag"
                         )
                     },
