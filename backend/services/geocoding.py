@@ -136,7 +136,7 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
             else:
                 logger.warning(f"Geocoding service returned non-200 status code: {response.status_code}")
     except Exception as e:
-        logger.warning(f"Error calling geocoding service for {lat}, {lng}: {str(e)}")
+        logger.warning(f"Error calling geocoding service for {lat}, {lng}: {str(e)}", exc_info=True)
         
     # Return previous cached location on any failure/timeout
     if state and state["last_name"]:
