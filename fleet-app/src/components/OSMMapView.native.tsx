@@ -51,9 +51,9 @@ export const OSMMapView: React.FC<OSMMapViewProps> = ({ gpsPoints, defaultCoords
         var marker;
         var polyline;
 
-        window.addEventListener("message", function(event) {
+        var handleMessage = function(event) {
           try {
-            var data = JSON.parse(event.data);
+            var data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
             if (data.type === 'update') {
               var lat = data.lat;
               var lng = data.lng;
@@ -76,7 +76,10 @@ export const OSMMapView: React.FC<OSMMapViewProps> = ({ gpsPoints, defaultCoords
               }
             }
           } catch(e) {}
-        });
+        };
+
+        window.addEventListener("message", handleMessage);
+        document.addEventListener("message", handleMessage);
       </script>
     </body>
     </html>
