@@ -14,21 +14,71 @@ trip_geocode_state = {}
 # Global variable that tracks the timestamp of the last Nominatim API call across the entire app
 last_global_api_call_time = 0.0
 
-async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]:
-    """
-    Perform reverse geocoding for coordinates to a readable address using OpenStreetMap Nominatim.
-    Implements per-trip cache-throttling and global 1s rate-limiting.
-    """
+async def _query_nominatim(lat: float, lng: float) -> Optional[str]:
+    """Helper to query Nominatim directly with rate limiting and retry protection"""
     global last_global_api_call_time
     now = time.time()
     
+    # Global Rate Limiter: Max 1 request per second globally
+    global_elapsed = now - last_global_api_call_time
+    if global_elapsed < 1.0:
+        wait_time = 1.0 - global_elapsed
+        logger.debug(f"Global limit hit. Sleeping {wait_time:.2f}s before Nominatim request")
+        await asyncio.sleep(wait_time)
+        now = time.time()
+
+    last_global_api_call_time = now
+    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json"
+    headers = {
+        "User-Agent": "VaahanFleetApp/1.0 (contact: info@vaahan.com)"
+    }
+    
+    try:
+        logger.info(f"🛰️ Calling public Nominatim reverse geocoding API for coordinates: ({lat}, {lng})")
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            response = await client.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                address = data.get("address", {})
+                
+                parts = []
+                for key in ["building", "amenity", "house_number", "industrial", "office"]:
+                    val = address.get(key)
+                    if val and val not in parts:
+                        parts.append(val)
+                for key in ["road", "neighbourhood", "suburb", "city_district"]:
+                    val = address.get(key)
+                    if val and val not in parts:
+                        parts.append(val)
+                for key in ["city", "town", "village", "county", "state", "postcode"]:
+                    val = address.get(key)
+                    if val and val not in parts:
+                        parts.append(val)
+                
+                has_geo = any(k in address for k in ["building", "amenity", "house_number", "road", "neighbourhood", "suburb", "city_district", "city", "town", "village", "county"])
+                if len(parts) < 2 or not has_geo:
+                    display_name = data.get("display_name", "")
+                    if display_name:
+                        parts = [p.strip() for p in display_name.split(",")[:4]]
+                
+                return ", ".join(parts) if parts else "Locating..."
+            else:
+                logger.warning(f"Nominatim returned non-200 status code: {response.status_code}")
+    except Exception as e:
+        logger.warning(f"Error querying Nominatim fallback for {lat}, {lng}: {str(e)}", exc_info=True)
+    return None
+
+async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]:
+    """
+    Perform reverse geocoding for coordinates to a readable address.
+    Queries Geoapify if key exists, with automatic fallback to OpenStreetMap Nominatim.
+    """
+    now = time.time()
     state = trip_geocode_state.get(trip_id)
     
-    # 1. Throttling check: Only query Nominatim if > 30s passed AND moved > ~200m
+    # 1. Throttling check: Only query API if > 30s passed AND moved > ~200m
     if state:
         time_elapsed = now - state["last_time"]
-        
-        # Simple bounding box distance check: 0.0018 degrees is roughly 200 meters
         lat_diff = lat - state["last_lat"]
         lng_diff = lng - state["last_lng"]
         dist_sq = lat_diff * lat_diff + lng_diff * lng_diff
@@ -38,107 +88,45 @@ async def reverse_geocode(lat: float, lng: float, trip_id: str) -> Optional[str]
             return state["last_name"]
 
     geoapify_key = os.getenv("GEOAPIFY_API_KEY")
+    location_name = None
 
-    if not geoapify_key:
-        # 2. Global Rate Limiter (Only needed for free public Nominatim): Max 1 request per second globally
-        global_elapsed = now - last_global_api_call_time
-        if global_elapsed < 1.0:
-            # If we have a cached value for this trip, return it immediately to avoid stalling telemetry
-            if state and state["last_name"]:
-                logger.debug(f"Global limit hit. Returning cached name for trip {trip_id}: {state['last_name']}")
-                return state["last_name"]
-            
-            # If no cached value, pause execution to satisfy rate limit
-            wait_time = 1.0 - global_elapsed
-            logger.debug(f"Global limit hit. Sleeping {wait_time:.2f}s before Nominatim request")
-            await asyncio.sleep(wait_time)
-            now = time.time()
-
-        # Update global API timestamp
-        last_global_api_call_time = now
-        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json"
-        headers = {
-            "User-Agent": "VaahanFleetApp/1.0 (contact: info@vaahan.com)"
-        }
-    else:
-        # Query Geoapify (no global 1s throttling required)
+    if geoapify_key:
         url = f"https://api.geoapify.com/v1/geocode/reverse?lat={lat}&lon={lng}&apiKey={geoapify_key}"
-        headers = None
-        
-    try:
-        if geoapify_key:
+        try:
             logger.info(f"🛰️ Calling Geoapify reverse geocoding API for coordinates: ({lat}, {lng})")
-        else:
-            logger.info(f"🛰️ Calling public Nominatim reverse geocoding API for coordinates: ({lat}, {lng})")
-
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            response = await client.get(url, headers=headers) if headers else await client.get(url)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                if geoapify_key:
-                    # Parse Geoapify structure: features[0].properties
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    data = response.json()
                     if "features" in data and len(data["features"]) > 0:
                         prop = data["features"][0].get("properties", {})
                         formatted = prop.get("formatted", "")
                         if formatted:
                             parts = [p.strip() for p in formatted.split(",") if p.strip()]
-                            # Remove trailing country to keep it short for UI card displays
                             if parts and parts[-1].lower() in ["india", "in"]:
                                 parts.pop()
                             parts = parts[:4]
                             location_name = ", ".join(parts)
-                        else:
-                            location_name = "Locating..."
-                    else:
-                        location_name = "Locating..."
                 else:
-                    # Parse standard Nominatim structure
-                    address = data.get("address", {})
-                    
-                    # Construct detailed, readable display name: building/amenity + house_number + road + suburb + city + postcode
-                    parts = []
-                    # 1. Add specific landmarks / buildings / house numbers first
-                    for key in ["building", "amenity", "house_number", "industrial", "office"]:
-                        val = address.get(key)
-                        if val and val not in parts:
-                            parts.append(val)
-                    # 2. Add road and suburb/neighborhood
-                    for key in ["road", "neighbourhood", "suburb", "city_district"]:
-                        val = address.get(key)
-                        if val and val not in parts:
-                            parts.append(val)
-                    # 3. Add city/town/county/state and postal code
-                    for key in ["city", "town", "village", "county", "state", "postcode"]:
-                        val = address.get(key)
-                        if val and val not in parts:
-                            parts.append(val)
-                    
-                    # Check if the generated parts list has too little detail (e.g., only postcode, or only 1 part)
-                    has_geo = any(k in address for k in ["building", "amenity", "house_number", "road", "neighbourhood", "suburb", "city_district", "city", "town", "village", "county"])
-                    if len(parts) < 2 or not has_geo:
-                        display_name = data.get("display_name", "")
-                        if display_name:
-                            # Extract first 4 segments of the formatted display name
-                            parts = [p.strip() for p in display_name.split(",")[:4]]
-                    
-                    location_name = ", ".join(parts) if parts else "Locating..."
-                
-                # Update trip cache
-                trip_geocode_state[trip_id] = {
-                    "last_time": now,
-                    "last_lat": lat,
-                    "last_lng": lng,
-                    "last_name": location_name
-                }
-                return location_name
-            else:
-                logger.warning(f"Geocoding service returned non-200 status code: {response.status_code}")
-    except Exception as e:
-        logger.warning(f"Error calling geocoding service for {lat}, {lng}: {str(e)}", exc_info=True)
+                    logger.warning(f"Geoapify returned non-200 status code: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Geoapify failed for {lat}, {lng}: {str(e)}. Falling back to Nominatim...", exc_info=True)
+
+    # 2. Fall back to Nominatim if Geoapify is not configured or failed
+    if not location_name:
+        location_name = await _query_nominatim(lat, lng)
+
+    # 3. Update cache and return
+    if location_name and location_name != "Locating...":
+        trip_geocode_state[trip_id] = {
+            "last_time": now,
+            "last_lat": lat,
+            "last_lng": lng,
+            "last_name": location_name
+        }
+        return location_name
         
-    # Return previous cached location on any failure/timeout
+    # Return previous cached location on complete failure
     if state and state["last_name"]:
         return state["last_name"]
     return "Locating..."
