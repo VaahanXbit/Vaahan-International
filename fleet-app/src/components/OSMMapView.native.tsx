@@ -16,8 +16,8 @@ interface OSMMapViewProps {
 export const OSMMapView: React.FC<OSMMapViewProps> = ({ gpsPoints, defaultCoords }) => {
   const webViewRef = useRef<WebView>(null);
 
-  // HTML template using Leaflet + voyager clean tiles
-  const mapHtml = `
+  // HTML template using Leaflet + voyager clean tiles (memoized to prevent WebView reloads on state changes)
+  const mapHtml = React.useMemo(() => `
     <!DOCTYPE html>
     <html>
     <head>
@@ -80,9 +80,9 @@ export const OSMMapView: React.FC<OSMMapViewProps> = ({ gpsPoints, defaultCoords
       </script>
     </body>
     </html>
-  `;
+  `, [defaultCoords.latitude, defaultCoords.longitude]);
 
-  useEffect(() => {
+  const sendUpdate = () => {
     if (gpsPoints && gpsPoints.length > 0) {
       const lastPoint = gpsPoints[gpsPoints.length - 1];
       webViewRef.current?.postMessage(JSON.stringify({
@@ -92,6 +92,10 @@ export const OSMMapView: React.FC<OSMMapViewProps> = ({ gpsPoints, defaultCoords
         path: gpsPoints.map(p => [p.lat, p.lng])
       }));
     }
+  };
+
+  useEffect(() => {
+    sendUpdate();
   }, [gpsPoints]);
 
   return (
@@ -103,6 +107,7 @@ export const OSMMapView: React.FC<OSMMapViewProps> = ({ gpsPoints, defaultCoords
         style={{ flex: 1 }}
         domStorageEnabled={true}
         javaScriptEnabled={true}
+        onLoadEnd={sendUpdate}
       />
     </View>
   );
