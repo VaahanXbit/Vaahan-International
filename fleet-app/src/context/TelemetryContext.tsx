@@ -50,9 +50,9 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           gpsPoints: initialData.gpsPoints && initialData.gpsPoints.length > current.gpsPoints.length ? initialData.gpsPoints : current.gpsPoints,
           liveSpeed: initialData.liveSpeed !== undefined ? initialData.liveSpeed : current.liveSpeed,
           liveLocation: initialData.liveLocation || current.liveLocation,
-          liveHarshBrakes: initialData.liveHarshBrakes !== undefined ? initialData.liveHarshBrakes : current.liveHarshBrakes,
-          liveHarshCorners: initialData.liveHarshCorners !== undefined ? initialData.liveHarshCorners : current.liveHarshCorners,
-          liveSpeeding: initialData.liveSpeeding !== undefined ? initialData.liveSpeeding : current.liveSpeeding
+          liveHarshBrakes: initialData.liveHarshBrakes !== undefined ? Math.max(initialData.liveHarshBrakes, current.liveHarshBrakes) : current.liveHarshBrakes,
+          liveHarshCorners: initialData.liveHarshCorners !== undefined ? Math.max(initialData.liveHarshCorners, current.liveHarshCorners) : current.liveHarshCorners,
+          liveSpeeding: initialData.liveSpeeding !== undefined ? Math.max(initialData.liveSpeeding, current.liveSpeeding) : current.liveSpeeding
         }
       };
     });
@@ -118,7 +118,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             };
 
             let updatedPoints = current.gpsPoints;
-            if (data.lat && data.lng) {
+            if (data.lat !== undefined && data.lng !== undefined && (data.lat !== 0 || data.lng !== 0)) {
               if (!updatedPoints.some(p => p.timestamp === data.timestamp)) {
                 updatedPoints = [...updatedPoints, { lat: data.lat, lng: data.lng, timestamp: data.timestamp }];
               }

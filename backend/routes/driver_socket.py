@@ -164,7 +164,7 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                     severity = min(abs(lax), 1.0)
                     detected_events.append((event_type, severity))
                 
-                # Insert detected events into TripEvent table
+                # Insert detected events into TripEvent table and update active trip aggregate counters in real-time
                 for evt_type, severity in detected_events:
                     event_detected = evt_type
                     trip_event = TripEvent(
@@ -183,6 +183,14 @@ async def websocket_trip_endpoint(websocket: WebSocket, trip_id: str):
                         created_at=timestamp
                     )
                     session.add(trip_event)
+                    
+                    # Update active trip aggregate counters
+                    if evt_type == "harsh_brake":
+                        trip.harsh_brake_count = (trip.harsh_brake_count or 0) + 1
+                    elif evt_type == "harsh_corner":
+                        trip.harsh_corner_count = (trip.harsh_corner_count or 0) + 1
+                    elif evt_type == "speeding":
+                        trip.speeding_count = (trip.speeding_count or 0) + 1
                 
                 session.commit()
                 

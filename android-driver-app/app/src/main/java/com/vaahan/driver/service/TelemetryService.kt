@@ -198,7 +198,7 @@ class TelemetryService : Service() {
             sensorManager.registerListener(sensorListener, accelSensor, SensorManager.SENSOR_DELAY_UI)
         }
 
-        // 3. Register GPS Location updates
+        // 3. Register Location updates (GPS + Network for indoor testing support)
         try {
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
@@ -206,6 +206,14 @@ class TelemetryService : Service() {
                 1f,
                 locationListener
             )
+            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                    LocationManager.NETWORK_PROVIDER,
+                    1000L,
+                    1f,
+                    locationListener
+                )
+            }
         } catch (se: SecurityException) {
             se.printStackTrace()
         }
