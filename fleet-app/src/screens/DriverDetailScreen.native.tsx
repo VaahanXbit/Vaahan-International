@@ -17,7 +17,7 @@ import { Gauge } from '../components/Gauge';
 import { TelemetryChart } from '../components/TelemetryChart';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import { OSMMapView } from '../components/OSMMapView.native';
 import { api } from '../api/client';
 
 const CITY_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
@@ -67,7 +67,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [liveSpeed, setLiveSpeed] = useState<number>(0);
   const [completedTrips, setCompletedTrips] = useState<any[]>([]);
-  const mapRef = useRef<MapView>(null);
+
 
   const companyCity = useSelector((state: any) => state.auth.user?.city);
   const lowercaseCity = (companyCity || 'bangalore').trim().toLowerCase();
@@ -188,17 +188,7 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     };
   }, [activeTripId]);
 
-  useEffect(() => {
-    if (hasGpsData && mapRef.current) {
-      const lastPoint = gpsPoints[gpsPoints.length - 1];
-      mapRef.current.animateToRegion({
-        latitude: lastPoint.lat,
-        longitude: lastPoint.lng,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-      }, 1000);
-    }
-  }, [gpsPoints]);
+
 
 
 
@@ -260,37 +250,10 @@ export const DriverDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               style={styles.tripsContainer}
             >
               <View style={styles.mapWrapper}>
-                <MapView
-                  ref={mapRef}
-                  style={styles.map}
-                  initialRegion={initialRegion}
-                  customMapStyle={darkMapStyle}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
-                  pitchEnabled={false}
-                  rotateEnabled={false}
-                >
-                  {hasGpsData && (
-                    <>
-                      <Polyline
-                        coordinates={gpsPoints.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-                        strokeColor={theme.colors.primary}
-                        strokeWidth={3}
-                      />
-                      <Marker
-                        coordinate={{
-                          latitude: gpsPoints[gpsPoints.length - 1].lat,
-                          longitude: gpsPoints[gpsPoints.length - 1].lng,
-                        }}
-                        anchor={{ x: 0.5, y: 0.5 }}
-                      >
-                        <View style={styles.truckMarker}>
-                          <MaterialIcons name="local-shipping" size={14} color="#000" />
-                        </View>
-                      </Marker>
-                    </>
-                  )}
-                </MapView>
+                <OSMMapView
+                  gpsPoints={gpsPoints}
+                  defaultCoords={defaultCoords}
+                />
 
                 {activeTripId !== null && (
                   <View style={styles.liveOverlayBadge}>

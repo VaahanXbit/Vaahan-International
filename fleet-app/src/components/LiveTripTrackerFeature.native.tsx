@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import { OSMMapView } from './OSMMapView.native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import theme from '../theme';
 import { Driver } from '../data/mockFleetData';
@@ -20,7 +20,7 @@ const CITY_COORDINATES: { [key: string]: { latitude: number; longitude: number }
 export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
   const { startTrackingTrip, getTelemetryState, setInitialTelemetry } = useTelemetry();
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
-  const mapRef = useRef<MapView>(null);
+
 
   const telemetryState = activeTripId ? getTelemetryState(activeTripId) : {
     gpsPoints: [],
@@ -107,17 +107,7 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
     };
   }, [driver.id]);
 
-  useEffect(() => {
-    if (hasGpsData && mapRef.current) {
-      const lastPoint = gpsPoints[gpsPoints.length - 1];
-      mapRef.current.animateToRegion({
-        latitude: lastPoint.lat,
-        longitude: lastPoint.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 1000);
-    }
-  }, [gpsPoints]);
+
 
   if (!activeTripId) {
     return (
@@ -133,36 +123,10 @@ export const LiveTripTrackerFeature: React.FC<Props> = ({ driver }) => {
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
       {/* Map View Wrapper */}
       <View style={styles.mapWrapper}>
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          initialRegion={initialRegion}
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          zoomEnabled={true}
-          scrollEnabled={true}
-        >
-          {hasGpsData && (
-            <>
-              <Polyline
-                coordinates={gpsPoints.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-                strokeColor={theme.colors.primary}
-                strokeWidth={4}
-              />
-              <Marker
-                coordinate={{
-                  latitude: gpsPoints[gpsPoints.length - 1].lat,
-                  longitude: gpsPoints[gpsPoints.length - 1].lng,
-                }}
-                anchor={{ x: 0.5, y: 0.5 }}
-              >
-                <View style={styles.truckMarker}>
-                  <MaterialIcons name="local-shipping" size={16} color="#000" />
-                </View>
-              </Marker>
-            </>
-          )}
-        </MapView>
+        <OSMMapView
+          gpsPoints={gpsPoints}
+          defaultCoords={defaultCoords}
+        />
 
         {/* Speed HUD Overlay */}
         <View style={styles.liveOverlayBadge}>
