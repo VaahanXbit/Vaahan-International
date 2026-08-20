@@ -358,6 +358,37 @@ fun LoginScreen(onNavigateToDashboard: () -> Unit) {
                                         Toast.makeText(context, "Invalid vehicle number format (e.g. GJ01AB1234)", Toast.LENGTH_LONG).show()
                                         return@PrimaryButton
                                     }
+
+                                    // Detailed State and RTO District validation for India
+                                    val stateCode = formattedPlate.substring(0, 2)
+                                    val rtoNum = formattedPlate.substring(2, 4).toIntOrNull()
+
+                                    val stateMaxRto = mapOf(
+                                        "AN" to 1, "AP" to 40, "AR" to 20, "AS" to 34, "BR" to 57, "CG" to 30,
+                                        "CH" to 4, "DD" to 3, "DN" to 9, "DL" to 13, "GA" to 12, "GJ" to 38,
+                                        "HR" to 99, "HP" to 97, "JK" to 22, "JH" to 24, "KA" to 72, "KL" to 99,
+                                        "LA" to 2, "LD" to 9, "MP" to 74, "MH" to 55, "MN" to 8, "ML" to 14,
+                                        "MZ" to 8, "NL" to 8, "OD" to 35, "OR" to 35, "PY" to 5, "PB" to 99,
+                                        "RJ" to 58, "SK" to 8, "TN" to 99, "TS" to 36, "TR" to 8, "UP" to 99,
+                                        "UK" to 20, "UA" to 20, "WB" to 99
+                                    )
+
+                                    if (!stateMaxRto.containsKey(stateCode)) {
+                                        Toast.makeText(context, "Invalid Indian state code: $stateCode", Toast.LENGTH_LONG).show()
+                                        return@PrimaryButton
+                                    }
+
+                                    val maxRto = stateMaxRto[stateCode] ?: 0
+                                    if (rtoNum == null || rtoNum < 1 || rtoNum > maxRto) {
+                                        val formattedMax = "%02d".format(maxRto)
+                                        Toast.makeText(
+                                            context,
+                                            "Invalid district code for state $stateCode. Must be between 01 and $formattedMax",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        return@PrimaryButton
+                                    }
+
                                     if (selectedVehicleType.isEmpty()) {
                                         Toast.makeText(context, "Please select vehicle type", Toast.LENGTH_SHORT).show()
                                         return@PrimaryButton
@@ -413,18 +444,20 @@ fun LoginScreen(onNavigateToDashboard: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
 
         // Mode Switch Link
-        Text(
-            text = if (isLoginMode) "New to Vaahan? Sign Up" else "Already have an account? Log In",
-            color = Color(0xFF4F46E5),
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .clickable { 
-                    isLoginMode = !isLoginMode 
-                    signupStep = 1
-                }
-                .padding(Spacing.sm)
-        )
+        if (isLoginMode || signupStep == 1) {
+            Text(
+                text = if (isLoginMode) "New to Vaahan? Sign Up" else "Already have an account? Log In",
+                color = Color(0xFF4F46E5),
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .clickable { 
+                        isLoginMode = !isLoginMode 
+                        signupStep = 1
+                    }
+                    .padding(Spacing.sm)
+            )
+        }
     }
 }

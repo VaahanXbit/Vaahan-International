@@ -798,4 +798,84 @@ async def disconnect_driver(
         )
 
 
+@router.post("/update-driver", tags=["Driver"])
+async def update_driver(
+    phone_number: str,
+    name: str = None,
+    vehicle_number: str = None,
+    vehicle_type: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Update driver details (name, vehicle number, vehicle type) using phone number as key.
+    """
+    try:
+        driver = db.query(Driver).filter(Driver.phone_number == phone_number).first()
+        if not driver:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Driver not found"
+            )
+
+        if name:
+            driver.name = name
+
+        if vehicle_number or vehicle_type:
+            vehicle = db.query(Vehicle).filter(Vehicle.driver_id == driver.id).first()
+            if vehicle:
+                if vehicle_number:
+                    # Check if the new vehicle number is already taken by another driver
+                    existing_vehicle = db.query(Vehicle).filter(
+                        Vehicle.vehicle_number == vehicle_number,
+                        Vehicle.driver_id != driver.id
+                    ).first()
+                    if existing_vehicle:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Vehicle number already registered to another driver"
+                        )
+                    vehicle.vehicle_number = vehicle_number
+                if vehicle_type:
+                    vehicle.vehicle_type = vehicle_type
+            else:
+                # If for some reason the driver has no vehicle linked, create one
+                if not vehicle_number:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Vehicle number is required as driver has no linked vehicle"
+                    )
+                vehicle = Vehicle(
+                    company_id=driver.company_id,
+                    driver_id=driver.id,
+                    vehicle_number=vehicle_number,
+                    vehicle_type=vehicle_type or "truck",
+                    status="active"
+                )
+                db.add(vehicle)
+
+        db.commit()
+
+        # Fetch updated vehicle details
+        updated_vehicle = db.query(Vehicle).filter(Vehicle.driver_id == driver.id).first()
+
+        return {
+            "status": "success",
+            "message": "Profile updated successfully",
+            "name": driver.name,
+            "phone_number": driver.phone_number,
+            "vehicle_number": updated_vehicle.vehicle_number if updated_vehicle else None,
+            "vehicle_type": updated_vehicle.vehicle_type if updated_vehicle else None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Driver update error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update profile: {str(e)}"
+        )
+
+
 logger.info("  Auth routes module loaded")

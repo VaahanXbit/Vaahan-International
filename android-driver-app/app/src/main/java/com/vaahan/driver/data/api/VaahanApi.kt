@@ -75,6 +75,14 @@ interface VaahanApi {
         @Query("phone_number") phoneNumber: String
     ): Response<DisconnectResponse>
 
+    @POST("auth/update-driver")
+    suspend fun updateDriver(
+        @Query("phone_number") phoneNumber: String,
+        @Query("name") name: String? = null,
+        @Query("vehicle_number") vehicleNumber: String? = null,
+        @Query("vehicle_type") vehicleType: String? = null
+    ): Response<DriverResponse>
+
     @POST("trips/start")
     suspend fun startTrip(
         @Query("driver_id") driverId: String,

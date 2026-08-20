@@ -40,14 +40,19 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onJoinFleet: () -> Unit, onLogout:
     val coroutineScope = rememberCoroutineScope()
     val sharedPref = remember { context.getSharedPreferences("vaahan_prefs", Context.MODE_PRIVATE) }
     
-    val driverName = remember { sharedPref.getString("driver_name", "Driver Name") ?: "Driver Name" }
+    var driverName by remember { mutableStateOf(sharedPref.getString("driver_name", "Driver Name") ?: "Driver Name") }
     val phoneNumber = remember { sharedPref.getString("phone_number", "") ?: "" }
     val initialCompanyName = remember { sharedPref.getString("company_name", "Independent Drivers") ?: "Independent Drivers" }
-    val vehicleNumber = remember { sharedPref.getString("vehicle_number", "") ?: "" }
-    val vehicleType = remember { sharedPref.getString("vehicle_type", "") ?: "" }
+    var vehicleNumber by remember { mutableStateOf(sharedPref.getString("vehicle_number", "") ?: "") }
+    var vehicleType by remember { mutableStateOf(sharedPref.getString("vehicle_type", "") ?: "") }
     
     var currentCompanyName by remember { mutableStateOf(initialCompanyName) }
     var isLoading by remember { mutableStateOf(false) }
+
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editName by remember { mutableStateOf("") }
+    var editVehicleNumber by remember { mutableStateOf("") }
+    var editVehicleType by remember { mutableStateOf("") }
 
     val isConnected = currentCompanyName != "Independent Drivers"
 
@@ -276,7 +281,12 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onJoinFleet: () -> Unit, onLogout:
 
                     // 2. EDIT PROFILE Button (Light grey background)
                     Button(
-                        onClick = { /* Edit profile logic */ },
+                        onClick = {
+                            editName = driverName
+                            editVehicleNumber = vehicleNumber
+                            editVehicleType = vehicleType
+                            showEditDialog = true
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -342,5 +352,139 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onJoinFleet: () -> Unit, onLogout:
                 }
             }
         }
+    }
+
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("Edit Profile", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Name Field
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Name") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Phone Field (Read-only / Disabled)
+                    OutlinedTextField(
+                        value = if (phoneNumber.startsWith("+91")) phoneNumber else "+91 $phoneNumber",
+                        onValueChange = {},
+                        label = { Text("Phone Number (Cannot be changed)") },
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Vehicle Number Field
+                    OutlinedTextField(
+                        value = editVehicleNumber,
+                        onValueChange = { editVehicleNumber = it.uppercase() },
+                        label = { Text("Vehicle Number") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Vehicle Type Field
+                    OutlinedTextField(
+                        value = editVehicleType,
+                        onValueChange = { editVehicleType = it },
+                        label = { Text("Vehicle Type (e.g. Truck (HCV))") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val cleanedPlate = editVehicleNumber.trim().uppercase().replace(" ", "").replace("-", "")
+                        val regex = Regex("^[A-Z]{2}[0-9]{2}[A-Z]{1,3}[0-9]{4}$")
+                        if (editName.trim().isEmpty()) {
+                            Toast.makeText(context, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (cleanedPlate.isEmpty()) {
+                            Toast.makeText(context, "Vehicle number cannot be empty", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        if (!regex.matches(cleanedPlate)) {
+                            Toast.makeText(context, "Invalid vehicle number format (e.g. GJ01AB1234)", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+
+                        // Detailed RTO validation
+                        val stateCode = cleanedPlate.substring(0, 2)
+                        val rtoNum = cleanedPlate.substring(2, 4).toIntOrNull()
+                        val stateMaxRto = mapOf(
+                            "AN" to 1, "AP" to 40, "AR" to 20, "AS" to 34, "BR" to 57, "CG" to 30,
+                            "CH" to 4, "DD" to 3, "DN" to 9, "DL" to 13, "GA" to 12, "GJ" to 38,
+                            "HR" to 99, "HP" to 97, "JK" to 22, "JH" to 24, "KA" to 72, "KL" to 99,
+                            "LA" to 2, "LD" to 9, "MP" to 74, "MH" to 55, "MN" to 8, "ML" to 14,
+                            "MZ" to 8, "NL" to 8, "OD" to 35, "OR" to 35, "PY" to 5, "PB" to 99,
+                            "RJ" to 58, "SK" to 8, "TN" to 99, "TS" to 36, "TR" to 8, "UP" to 99,
+                            "UK" to 20, "UA" to 20, "WB" to 99
+                        )
+                        if (!stateMaxRto.containsKey(stateCode)) {
+                            Toast.makeText(context, "Invalid Indian state code: $stateCode", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+                        val maxRto = stateMaxRto[stateCode] ?: 0
+                        if (rtoNum == null || rtoNum < 1 || rtoNum > maxRto) {
+                            val formattedMax = "%02d".format(maxRto)
+                            Toast.makeText(
+                                context,
+                                "Invalid district code for state $stateCode. Must be between 01 and $formattedMax",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@Button
+                        }
+
+                        isLoading = true
+                        coroutineScope.launch {
+                            try {
+                                val response = RetrofitClient.api.updateDriver(
+                                    phoneNumber = phoneNumber,
+                                    name = editName.trim(),
+                                    vehicleNumber = cleanedPlate,
+                                    vehicleType = editVehicleType.trim()
+                                )
+                                if (response.isSuccessful && response.body() != null) {
+                                    val body = response.body()!!
+                                    sharedPref.edit().apply {
+                                        putString("driver_name", body.name)
+                                        putString("vehicle_number", body.vehicle_number)
+                                        putString("vehicle_type", body.vehicle_type)
+                                        apply()
+                                    }
+                                    driverName = body.name ?: ""
+                                    vehicleNumber = body.vehicle_number ?: ""
+                                    vehicleType = body.vehicle_type ?: ""
+                                    showEditDialog = false
+                                    Toast.makeText(context, "Profile updated successfully", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val errMsg = response.errorBody()?.string() ?: "Failed to update profile"
+                                    Toast.makeText(context, errMsg, Toast.LENGTH_LONG).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Network error: ${e.message}", Toast.LENGTH_LONG).show()
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                ) {
+                    Text("Save", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
     }
 }
