@@ -4,6 +4,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -49,10 +51,15 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onJoinFleet: () -> Unit, onLogout:
     var currentCompanyName by remember { mutableStateOf(initialCompanyName) }
     var isLoading by remember { mutableStateOf(false) }
 
+    val vehicleOptions = remember {
+        listOf("Bike", "Auto", "Car", "Van", "Bus", "Mini Truck (SCV)", "Pickup Truck (LCV)", "Truck (HCV)")
+    }
+
     var showEditDialog by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf("") }
     var editVehicleNumber by remember { mutableStateOf("") }
     var editVehicleType by remember { mutableStateOf("") }
+    var showVehicleTypeDropdown by remember { mutableStateOf(false) }
 
     val isConnected = currentCompanyName != "Independent Drivers"
 
@@ -386,15 +393,42 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onJoinFleet: () -> Unit, onLogout:
                         onValueChange = { editVehicleNumber = it.uppercase() },
                         label = { Text("Vehicle Number") },
                         modifier = Modifier.fillMaxWidth()
-                    )
+                    )                    // Vehicle Type Dropdown Field
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = editVehicleType,
+                            onValueChange = {},
+                            label = { Text("Vehicle Type") },
+                            readOnly = true,
+                            trailingIcon = {
+                                IconButton(onClick = { showVehicleTypeDropdown = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = "Select Vehicle Type"
+                                    )
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showVehicleTypeDropdown = true }
+                        )
 
-                    // Vehicle Type Field
-                    OutlinedTextField(
-                        value = editVehicleType,
-                        onValueChange = { editVehicleType = it },
-                        label = { Text("Vehicle Type (e.g. Truck (HCV))") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        DropdownMenu(
+                            expanded = showVehicleTypeDropdown,
+                            onDismissRequest = { showVehicleTypeDropdown = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            vehicleOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        editVehicleType = option
+                                        showVehicleTypeDropdown = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -439,6 +473,11 @@ fun ProfileScreen(onNavigateBack: () -> Unit, onJoinFleet: () -> Unit, onLogout:
                                 "Invalid district code for state $stateCode. Must be between 01 and $formattedMax",
                                 Toast.LENGTH_LONG
                             ).show()
+                            return@Button
+                        }
+
+                        if (editVehicleType.trim().isEmpty() || !vehicleOptions.contains(editVehicleType)) {
+                            Toast.makeText(context, "Please select a valid vehicle type", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
 
