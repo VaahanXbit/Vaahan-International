@@ -8,7 +8,7 @@ interface Props {
   harshBrakes?: number;
   harshCorners?: number;
   speeding?: number;
-  safetyScore?: number;
+  safetyScore?: number | string;
 }
 
 export const DriverSafetyFeature: React.FC<Props> = ({ driver, harshBrakes, harshCorners, speeding, safetyScore }) => {

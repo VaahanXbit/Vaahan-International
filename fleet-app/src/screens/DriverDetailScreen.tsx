@@ -14,7 +14,6 @@ import { RootStackParamList } from '../navigation/types';
 import theme from '../theme';
 import { getDriverDetail, Driver } from '../data/mockFleetData';
 import { Gauge } from '../components/Gauge';
-import { TelemetryChart } from '../components/TelemetryChart';
 import { AddDriverModal } from '../components/AddDriverModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';

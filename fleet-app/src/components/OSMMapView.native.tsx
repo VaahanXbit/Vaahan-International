@@ -14,7 +14,7 @@ interface OSMMapViewProps {
 }
 
 export const OSMMapView: React.FC<OSMMapViewProps> = ({ gpsPoints, defaultCoords }) => {
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<any>(null);
 
   // HTML template using Leaflet + voyager clean tiles (memoized to prevent WebView reloads on state changes)
   const mapHtml = React.useMemo(() => `

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { OSMMapView } from './OSMMapView.native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { MaterialIcons } from '@expo/vector-icons';
 import theme from '../theme';
 import { Driver } from '../data/mockFleetData';
 import { api } from '../api/client';

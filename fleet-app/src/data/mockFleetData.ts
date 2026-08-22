@@ -18,6 +18,7 @@ export interface Driver {
   fuelLevel: number; // 0-100
   mileageDiff: number; // e.g. -1.2 or +18.0
   status: 'Active' | 'Idle' | 'Off-duty';
+  city?: string;
   enabledProducts: string[];
   telemetryHistory: number[];
   alerts: {
