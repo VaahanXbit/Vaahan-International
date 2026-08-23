@@ -18,7 +18,7 @@ const IS_LOCAL_TESTING = false;
 
 const getBaseURL = () => {
   if (!IS_LOCAL_TESTING) {
-    return 'https://vaahan-international-1-yro3.onrender.com/api/v1';
+    return 'https://vaahan-international-1-kv8e.onrender.com/api/v1';
   }
 
   if (process.env.REACT_APP_API_URL) {

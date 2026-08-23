@@ -34,7 +34,7 @@ const getBaseURL = () => {
   }
   
   // High-reliability production backend URL hosted on Render
-  return 'https://vaahan-international-1-yro3.onrender.com/api/v1';
+  return 'https://vaahan-international-1-kv8e.onrender.com/api/v1';
 };
 
 const API_BASE_URL = getBaseURL();

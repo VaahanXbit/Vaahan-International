@@ -8,6 +8,6 @@ object AppConfig {
     // const val WS_URL = "ws://10.0.2.2:8001/api/v1/auth/ws/trip/"
 
     // --- TARGET: PRODUCTION RENDER SERVER (Real Phone APK) ---
-    const val BASE_URL = "https://vaahan-international-1-yro3.onrender.com/api/v1/"
-    const val WS_URL = "wss://vaahan-international-1-yro3.onrender.com/api/v1/auth/ws/trip/"
+    const val BASE_URL = "https://vaahan-international-1-kv8e.onrender.com/api/v1/"
+    const val WS_URL = "wss://vaahan-international-1-kv8e.onrender.com/api/v1/auth/ws/trip/"
 }
