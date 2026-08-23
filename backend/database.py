@@ -16,15 +16,18 @@
 ================================================================================
 """
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from typing import Generator
 import os
 import logging
+from dotenv import load_dotenv
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ============================================================================
 # DATABASE CONFIGURATION
@@ -53,20 +56,27 @@ logger.info(f"Database URL: {DATABASE_URL}")
 # ENGINE SETUP WITH CONNECTION POOLING
 # ============================================================================
 
-engine = create_engine(
-    DATABASE_URL,
-    poolclass=None,  # Use default pool (QueuePool)
-    pool_size=20,  # Keep 20 connections in pool
-    max_overflow=10,  # Allow up to 10 additional overflow connections
-    pool_pre_ping=True,  # Test connection before using
-    echo=False,  # Set to True for SQL debugging
-    connect_args={
-        "connect_timeout": 10,
-        "application_name": "fleet_platform_backend",
-    }
-)
-
-logger.info("  SQLAlchemy engine created with connection pooling")
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        echo=False
+    )
+    logger.info("  SQLAlchemy SQLite engine created")
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=None,  # Use default pool (QueuePool)
+        pool_size=20,  # Keep 20 connections in pool
+        max_overflow=10,  # Allow up to 10 additional overflow connections
+        pool_pre_ping=True,  # Test connection before using
+        echo=False,  # Set to True for SQL debugging
+        connect_args={
+            "connect_timeout": 10,
+            "application_name": "fleet_platform_backend",
+        }
+    )
+    logger.info("  SQLAlchemy engine created with connection pooling")
 
 # ============================================================================
 # SESSION FACTORY
@@ -150,6 +160,16 @@ def init_db():
         from models import Base as ImportedBase
         ImportedBase.metadata.create_all(bind=engine)
         logger.info("  All database tables created successfully")
+        
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE gps_coordinates ADD COLUMN IF NOT EXISTS accel_x NUMERIC(9, 6)"))
+            conn.execute(text("ALTER TABLE gps_coordinates ADD COLUMN IF NOT EXISTS accel_y NUMERIC(9, 6)"))
+            conn.execute(text("ALTER TABLE gps_coordinates ADD COLUMN IF NOT EXISTS accel_z NUMERIC(9, 6)"))
+            conn.execute(text("ALTER TABLE trips ADD COLUMN IF NOT EXISTS final_score NUMERIC(5, 2) DEFAULT 100.0"))
+            conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS unique_pin VARCHAR(6) UNIQUE"))
+            conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS password VARCHAR(255)"))
+            conn.commit()
+        logger.info("  Startup migrations for accelerometer columns completed successfully")
     except Exception as e:
         logger.error(f"❌ Failed to initialize database: {str(e)}")
         raise
@@ -171,7 +191,7 @@ def verify_db_connection() -> bool:
     try:
         with engine.connect() as conn:
             # Simple test query
-            result = conn.execute("SELECT 1")
+            result = conn.execute(text("SELECT 1"))
             logger.info("  Database connection verified")
             return True
     except Exception as e:
@@ -191,17 +211,17 @@ def receive_connect(dbapi_conn, connection_record):
     Usage: Enable foreign key constraints, set connection parameters
     """
     # For SQLite, enable foreign keys
-    # For PostgreSQL, this may not be needed as it's enabled by default
     try:
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
-        logger.debug("Foreign key constraints enabled")
+        if dbapi_conn.__class__.__module__.startswith("sqlite3"):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+            logger.debug("Foreign key constraints enabled for SQLite")
     except Exception as e:
-        logger.debug(f"Could not enable foreign keys (PostgreSQL doesn't need this): {e}")
+        logger.debug(f"Could not enable foreign keys: {e}")
 
 
-@event.listens_for(engine, "pool_connect")
+@event.listens_for(engine.pool, "connect")
 def receive_pool_connect(dbapi_conn, connection_record):
     """
     Called when a connection is retrieved from the pool
@@ -209,7 +229,7 @@ def receive_pool_connect(dbapi_conn, connection_record):
     logger.debug("Connection retrieved from pool")
 
 
-@event.listens_for(engine, "pool_checkout")
+@event.listens_for(engine.pool, "checkout")
 def receive_pool_checkout(dbapi_conn, connection_record, connection_proxy):
     """
     Called when a connection is checked out from the pool
@@ -217,7 +237,7 @@ def receive_pool_checkout(dbapi_conn, connection_record, connection_proxy):
     pass
 
 
-@event.listens_for(engine, "pool_checkin")
+@event.listens_for(engine.pool, "checkin")
 def receive_pool_checkin(dbapi_conn, connection_record):
     """
     Called when a connection is returned to the pool
@@ -249,6 +269,8 @@ if __name__ == "__main__":
     # Test database connection on module run
     logger.info("Testing database connection...")
     if verify_db_connection():
-        logger.info("Connection successful!")
+        logger.info("Connection successful! Initializing database tables...")
+        init_db()
+        logger.info("Tables created successfully!")
     else:
         logger.error("Connection failed!")

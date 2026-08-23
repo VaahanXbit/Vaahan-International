@@ -23,10 +23,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from datetime import datetime
 import logging
+import random
 
 # Import database and models
 from database import get_db
-from models import Company, Driver
+from models import Company, Driver, Vehicle
 
 # Import authentication utilities
 from auth import JWTManager, PasswordManager, OTPManager
@@ -48,42 +49,11 @@ async def register_company(
     phone: str,
     city: str,
     gst_number: str,
+    password: str,
     db: Session = Depends(get_db)
 ):
     """
     Register a new company (fleet owner)
-    
-    Args:
-        name: Company name (e.g., "ABC Transport Ltd")
-        email: Company email (must be unique)
-        phone: Contact phone number
-        city: Company city
-        gst_number: GST registration number (unique)
-        
-    Returns:
-        dict: Success status and company ID
-        
-    Example Request:
-        POST /api/v1/auth/register-company
-        {
-            "name": "ABC Transport",
-            "email": "contact@abctransport.com",
-            "phone": "9876543210",
-            "city": "Bangalore",
-            "gst_number": "29ABCDE1234F1Z5"
-        }
-        
-    Example Response:
-        {
-            "status": "success",
-            "message": "Company registered successfully",
-            "company_id": "550e8400-e29b-41d4-a716-446655440000"
-        }
-        
-    Error Cases:
-        - 400: Email already exists
-        - 400: GST number already exists
-        - 500: Database error
     """
     try:
         # Check if company already exists
@@ -95,6 +65,13 @@ async def register_company(
                 detail="Email already registered"
             )
         
+        # Generate unique 6-digit PIN
+        while True:
+            pin = f"{random.randint(100000, 999999)}"
+            existing_pin = db.query(Company).filter(Company.unique_pin == pin).first()
+            if not existing_pin:
+                break
+
         # Create new company
         company = Company(
             name=name,
@@ -102,6 +79,8 @@ async def register_company(
             phone=phone,
             city=city,
             gst_number=gst_number,
+            password=password,
+            unique_pin=pin,
             subscription_status="active"
         )
         
@@ -109,13 +88,18 @@ async def register_company(
         db.commit()
         db.refresh(company)
         
-        logger.info(f"  Company registered: {company.id} - {name}")
+        logger.info(f"  Company registered: {company.id} - {name} - PIN: {pin}")
         
         return {
             "status": "success",
             "message": "Company registered successfully",
             "company_id": str(company.id),
-            "email": company.email
+            "name": company.name,
+            "email": company.email,
+            "phone": company.phone,
+            "city": company.city,
+            "gst_number": company.gst_number,
+            "unique_pin": company.unique_pin
         }
         
     except HTTPException:
@@ -126,6 +110,100 @@ async def register_company(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to register company"
+        )
+
+
+@router.post("/login-company", tags=["Company"])
+async def login_company(
+    email: str,
+    password: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Company login - verifies email and password, then returns full profile details.
+    """
+    try:
+        company = db.query(Company).filter(Company.email == email).first()
+        if not company:
+            logger.warning(f"⚠️  Company login failed - email not found: {email}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company not registered with this email address"
+            )
+            
+        if company.password != password:
+            logger.warning(f"⚠️  Company login failed - invalid password for: {email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid password"
+            )
+            
+        logger.info(f"  Company login successful: {company.name} (ID: {company.id})")
+        return {
+            "status": "success",
+            "company_id": str(company.id),
+            "name": company.name,
+            "email": company.email,
+            "phone": company.phone,
+            "city": company.city,
+            "gst_number": company.gst_number,
+            "unique_pin": company.unique_pin
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Company login error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to login company"
+        )
+
+
+@router.put("/update-company/{company_id}", tags=["Company"])
+async def update_company(
+    company_id: str,
+    name: str,
+    email: str,
+    phone: str,
+    gst_number: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Update details of an existing company (fleet owner)
+    """
+    try:
+        company = db.query(Company).filter(Company.id == company_id).first()
+        if not company:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company not found"
+            )
+        
+        company.name = name
+        company.email = email
+        company.phone = phone
+        company.gst_number = gst_number
+        db.commit()
+        db.refresh(company)
+        
+        logger.info(f"  Company updated: {company.id} - {name}")
+        return {
+            "status": "success",
+            "company_id": str(company.id),
+            "name": company.name,
+            "email": company.email,
+            "phone": company.phone,
+            "city": company.city,
+            "gst_number": company.gst_number,
+            "unique_pin": company.unique_pin
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Company update error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update company profile"
         )
 
 
@@ -206,6 +284,7 @@ async def verify_driver(
     otp: str,
     name: str,
     vehicle_number: str,
+    vehicle_type: str = "truck",
     db: Session = Depends(get_db)
 ):
     """
@@ -256,34 +335,57 @@ async def verify_driver(
         - 500: Database error
     """
     try:
-        # Verify OTP
-        if not OTPManager.verify_otp(phone_number, otp):
-            logger.warning(f"⚠️  OTP verification failed for {phone_number}")
+        # Match OTP/PIN with Company unique_pin
+        company = db.query(Company).filter(Company.unique_pin == otp).first()
+        if not company:
+            logger.warning(f"⚠️  Invalid Fleet PIN/OTP entered: {otp}")
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired OTP"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Fleet PIN. Please contact your Fleet Manager."
             )
         
         # Check if driver already exists
-        existing = db.query(Driver).filter(Driver.phone_number == phone_number).first()
-        if existing:
-            logger.warning(f"⚠️  Driver already exists: {phone_number}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Driver already registered with this phone number"
+        driver = db.query(Driver).filter(Driver.phone_number == phone_number).first()
+        
+        # Get or create vehicle for the driver
+        vehicle = db.query(Vehicle).filter(Vehicle.vehicle_number == vehicle_number).first()
+        if not vehicle:
+            vehicle = Vehicle(
+                company_id=company.id,
+                vehicle_number=vehicle_number,
+                vehicle_type=vehicle_type,
+                status="active"
             )
+            db.add(vehicle)
+            db.commit()
+            db.refresh(vehicle)
+        else:
+            # Update vehicle company assignment and type
+            vehicle.company_id = company.id
+            vehicle.vehicle_type = vehicle_type
+            db.commit()
         
-        # Create driver account
-        driver = Driver(
-            phone_number=phone_number,
-            name=name,
-            vehicle_number=vehicle_number,
-            status="active"
-        )
+        if driver:
+            # Update existing driver company association
+            driver.company_id = company.id
+            driver.name = name
+            db.commit()
+            db.refresh(driver)
+        else:
+            # Create driver account under the matched company
+            driver = Driver(
+                phone_number=phone_number,
+                name=name,
+                company_id=company.id,
+                status="active"
+            )
+            db.add(driver)
+            db.commit()
+            db.refresh(driver)
         
-        db.add(driver)
+        # Link the vehicle to the driver
+        vehicle.driver_id = driver.id
         db.commit()
-        db.refresh(driver)
         
         # Create JWT tokens
         access_token = JWTManager.create_access_token(
@@ -296,14 +398,17 @@ async def verify_driver(
             role="driver"
         )
         
-        logger.info(f"  Driver verified and registered: {driver.id} - {name}")
+        logger.info(f"  Driver verified and connected to fleet: {driver.id} - {name} (Fleet: {company.name})")
         
         return {
             "status": "success",
-            "message": "Driver verified and registered",
+            "message": f"Successfully connected to {company.name}",
             "driver_id": str(driver.id),
             "name": driver.name,
             "phone_number": driver.phone_number,
+            "vehicle_number": vehicle.vehicle_number if vehicle else None,
+            "vehicle_type": vehicle.vehicle_type if vehicle else None,
+            "company_name": company.name,
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
@@ -511,6 +616,265 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get user information"
+        )
+
+@router.post("/driver-direct", tags=["Driver"])
+async def driver_direct(
+    phone_number: str,
+    name: str = None,
+    vehicle_number: str = None,
+    vehicle_type: str = "truck",
+    is_login: bool = False,
+    db: Session = Depends(get_db)
+):
+    """
+    Direct login/registration for driver without OTP (development & testing stopgap)
+    """
+    try:
+        driver = db.query(Driver).filter(Driver.phone_number == phone_number).first()
+        
+        if is_login:
+            if not driver:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Driver not registered with this phone number"
+                )
+            
+            vehicle = db.query(Vehicle).filter(Vehicle.driver_id == driver.id).first()
+            vehicle_num = vehicle.vehicle_number if vehicle else "default"
+            
+            company = db.query(Company).filter(Company.id == driver.company_id).first()
+            company_name = company.name if company else "Independent Drivers"
+            
+            access_token = JWTManager.create_access_token(user_id=str(driver.id), role="driver")
+            refresh_token = JWTManager.create_refresh_token(user_id=str(driver.id), role="driver")
+            
+            return {
+                "status": "success",
+                "message": "Driver logged in successfully",
+                "driver_id": str(driver.id),
+                "name": driver.name,
+                "phone_number": driver.phone_number,
+                "vehicle_number": vehicle_num,
+                "vehicle_type": vehicle.vehicle_type if vehicle else "truck",
+                "company_name": company_name,
+                "access_token": access_token,
+                "refresh_token": refresh_token
+            }
+        else:
+            if driver:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Driver already registered with this phone number. Please log in instead."
+                )
+            
+            if not name or not vehicle_number:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Name and Vehicle Number are required for registration"
+                )
+            
+            vehicle = db.query(Vehicle).filter(Vehicle.vehicle_number == vehicle_number).first()
+            if not vehicle:
+                company = db.query(Company).filter(Company.name == "Independent Drivers").first()
+                if not company:
+                    company = Company(
+                        name="Independent Drivers",
+                        email="independent@vaahan.com",
+                        phone="0000000000",
+                        city="System",
+                        gst_number="SYSTEM_INDEPENDENT",
+                        subscription_status="active"
+                    )
+                    db.add(company)
+                    db.commit()
+                    db.refresh(company)
+                
+                vehicle = Vehicle(
+                    company_id=company.id,
+                    vehicle_number=vehicle_number,
+                    vehicle_type=vehicle_type,
+                    status="active"
+                )
+                db.add(vehicle)
+                db.commit()
+                db.refresh(vehicle)
+            else:
+                company = db.query(Company).filter(Company.id == vehicle.company_id).first()
+                if not company:
+                    company = db.query(Company).filter(Company.name == "Independent Drivers").first()
+                vehicle.vehicle_type = vehicle_type
+                db.commit()
+            
+            driver = Driver(
+                phone_number=phone_number,
+                name=name,
+                company_id=vehicle.company_id,
+                status="active"
+            )
+            db.add(driver)
+            db.commit()
+            db.refresh(driver)
+            
+            vehicle.driver_id = driver.id
+            db.commit()
+            
+            access_token = JWTManager.create_access_token(user_id=str(driver.id), role="driver")
+            refresh_token = JWTManager.create_refresh_token(user_id=str(driver.id), role="driver")
+            
+            return {
+                "status": "success",
+                "message": "Driver registered successfully",
+                "driver_id": str(driver.id),
+                "name": driver.name,
+                "phone_number": driver.phone_number,
+                "vehicle_number": vehicle_number,
+                "vehicle_type": vehicle_type,
+                "company_name": company.name if company else "Independent Drivers",
+                "access_token": access_token,
+                "refresh_token": refresh_token
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Direct driver auth error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to authenticate driver"
+        )
+
+@router.post("/disconnect-driver", tags=["Driver"])
+async def disconnect_driver(
+    phone_number: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Disconnect a driver from their current company/fleet, reverting them to "Independent Drivers".
+    """
+    try:
+        driver = db.query(Driver).filter(Driver.phone_number == phone_number).first()
+        if not driver:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Driver not found"
+            )
+        
+        company = db.query(Company).filter(Company.name == "Independent Drivers").first()
+        if not company:
+            company = Company(
+                name="Independent Drivers",
+                email="independent@vaahan.com",
+                phone="0000000000",
+                city="System",
+                gst_number="SYSTEM_INDEPENDENT",
+                subscription_status="active"
+            )
+            db.add(company)
+            db.commit()
+            db.refresh(company)
+        
+        driver.company_id = company.id
+        db.commit()
+        
+        vehicle = db.query(Vehicle).filter(Vehicle.driver_id == driver.id).first()
+        if vehicle:
+            vehicle.company_id = company.id
+            db.commit()
+        
+        return {
+            "status": "success",
+            "message": "Disconnected from fleet successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Driver disconnect error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to disconnect driver from fleet"
+        )
+
+
+@router.post("/update-driver", tags=["Driver"])
+async def update_driver(
+    phone_number: str,
+    name: str = None,
+    vehicle_number: str = None,
+    vehicle_type: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Update driver details (name, vehicle number, vehicle type) using phone number as key.
+    """
+    try:
+        driver = db.query(Driver).filter(Driver.phone_number == phone_number).first()
+        if not driver:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Driver not found"
+            )
+
+        if name:
+            driver.name = name
+
+        if vehicle_number or vehicle_type:
+            vehicle = db.query(Vehicle).filter(Vehicle.driver_id == driver.id).first()
+            if vehicle:
+                if vehicle_number:
+                    # Check if the new vehicle number is already taken by another driver
+                    existing_vehicle = db.query(Vehicle).filter(
+                        Vehicle.vehicle_number == vehicle_number,
+                        Vehicle.driver_id != driver.id
+                    ).first()
+                    if existing_vehicle:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Vehicle number already registered to another driver"
+                        )
+                    vehicle.vehicle_number = vehicle_number
+                if vehicle_type:
+                    vehicle.vehicle_type = vehicle_type
+            else:
+                # If for some reason the driver has no vehicle linked, create one
+                if not vehicle_number:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Vehicle number is required as driver has no linked vehicle"
+                    )
+                vehicle = Vehicle(
+                    company_id=driver.company_id,
+                    driver_id=driver.id,
+                    vehicle_number=vehicle_number,
+                    vehicle_type=vehicle_type or "truck",
+                    status="active"
+                )
+                db.add(vehicle)
+
+        db.commit()
+
+        # Fetch updated vehicle details
+        updated_vehicle = db.query(Vehicle).filter(Vehicle.driver_id == driver.id).first()
+
+        return {
+            "status": "success",
+            "message": "Profile updated successfully",
+            "name": driver.name,
+            "phone_number": driver.phone_number,
+            "vehicle_number": updated_vehicle.vehicle_number if updated_vehicle else None,
+            "vehicle_type": updated_vehicle.vehicle_type if updated_vehicle else None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Driver update error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update profile: {str(e)}"
         )
 
 

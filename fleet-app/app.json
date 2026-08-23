@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "fleet-owner-app",
+    "slug": "fleet-owner-app",
+    "version": "1.0.0",
+    "android": {
+      "package": "com.shravani_2906.fleetownerapp"
+    }
+  }
+}

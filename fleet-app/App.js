@@ -24,14 +24,15 @@ import { Provider, useSelector, useDispatch } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import authReducer, { setToken, setUser } from './src/store/authSlice';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
-import { DriversScreen } from './src/screens/DriversScreen';
-import { ScoresScreen } from './src/screens/ScoresScreen';
-import { WalletsScreen } from './src/screens/WalletsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { DriverDetailScreen } from './src/screens/DriverDetailScreen';
+import { FeatureDetailScreen } from './src/screens/FeatureDetailScreen';
+import { TelemetryProvider } from './src/context/TelemetryContext';
 
 // ============================================================================
 // REDUX STORE
@@ -56,30 +57,40 @@ const AuthStack = () => (
 );
 
 /**
+ * Dashboard Tab Stack - Allows pushing details screens inside Dashboard tab
+ */
+const DashboardStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Dashboard" component={DashboardScreen} />
+    <Stack.Screen name="DriverDetail" component={DriverDetailScreen} />
+    <Stack.Screen name="FeatureDetail" component={FeatureDetailScreen} />
+  </Stack.Navigator>
+);
+
+/**
  * App Stack - Tab-based navigation
  */
 const AppStack = () => (
   <Tab.Navigator
     screenOptions={({ route }) => ({
+      headerShown: false,
       tabBarIcon: ({ focused, color, size }) => {
         let iconName;
         if (route.name === 'Dashboard') iconName = focused ? 'stats-chart' : 'stats-chart-outline';
-        else if (route.name === 'Drivers') iconName = focused ? 'people' : 'people-outline';
-        else if (route.name === 'Scores') iconName = focused ? 'bar-chart' : 'bar-chart-outline';
-        else if (route.name === 'Wallets') iconName = focused ? 'wallet' : 'wallet-outline';
         else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
-      tabBarActiveTintColor: '#007AFF',
-      tabBarInactiveTintColor: '#999',
-      headerStyle: { backgroundColor: '#007AFF' },
-      headerTintColor: '#FFF',
+      tabBarActiveTintColor: '#9bd0d5',
+      tabBarInactiveTintColor: '#a2adad',
+      tabBarStyle: {
+        backgroundColor: '#131b1b',
+        borderTopColor: '#3f4a4a',
+        borderTopWidth: 1,
+        paddingTop: 4,
+      },
     })}
   >
-    <Tab.Screen name="Dashboard" component={DashboardScreen} />
-    <Tab.Screen name="Drivers" component={DriversScreen} />
-    <Tab.Screen name="Scores" component={ScoresScreen} />
-    <Tab.Screen name="Wallets" component={WalletsScreen} />
+    <Tab.Screen name="Dashboard" component={DashboardStack} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>
 );
@@ -135,7 +146,11 @@ const RootNavigator = () => {
 export default function App() {
   return (
     <Provider store={store}>
-      <RootNavigator />
+      <TelemetryProvider>
+        <SafeAreaProvider>
+          <RootNavigator />
+        </SafeAreaProvider>
+      </TelemetryProvider>
     </Provider>
   );
 }
